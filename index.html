@@ -1480,6 +1480,52 @@
                 const sec = Math.floor(s % 60);
                 return `${m}:${sec.toString().padStart(2, '0')}`;
             };
+            
+            // V6 NEW: Get quota level with friendly messages
+            const getQuotaLevel = (calls) => {
+                if (calls === 0) return { 
+                    level: 'excellent', 
+                    icon: '✨', 
+                    message: 'No syncs today yet', 
+                    desc: 'You have plenty of room!', 
+                    percent: 0 
+                };
+                if (calls < 50) return { 
+                    level: 'great', 
+                    icon: '👍', 
+                    message: 'Very light usage', 
+                    desc: "You're doing great!", 
+                    percent: (calls / 50) * 35 
+                };
+                if (calls < 200) return { 
+                    level: 'good', 
+                    icon: '✓', 
+                    message: 'Normal usage', 
+                    desc: 'Everything looks good', 
+                    percent: 35 + ((calls - 50) / 150) * 30 
+                };
+                if (calls < 500) return { 
+                    level: 'moderate', 
+                    icon: '📊', 
+                    message: 'Moderate usage', 
+                    desc: 'Still plenty of room', 
+                    percent: 65 + ((calls - 200) / 300) * 20 
+                };
+                if (calls < 800) return { 
+                    level: 'high', 
+                    icon: '⚠️', 
+                    message: 'High usage today', 
+                    desc: 'Consider syncing less often', 
+                    percent: 85 + ((calls - 500) / 300) * 10 
+                };
+                return { 
+                    level: 'very-high', 
+                    icon: '🔴', 
+                    message: 'Very high usage', 
+                    desc: 'Take a break from syncing', 
+                    percent: Math.min(100, 95 + ((calls - 800) / 200) * 5) 
+                };
+            };
 
             // Drag and drop for playlists
             const handlePlaylistDragStart = (e, index) => {
