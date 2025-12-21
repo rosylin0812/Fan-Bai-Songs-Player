@@ -8,9 +8,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Music Player">
     <link rel="manifest" href="manifest.json">
+    <script src="https://apis.google.com/js/api.js"></script>
     <link rel="icon" type="image/svg+xml" href="icon-final.svg">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <title>Music Player</title>
+    <title>Music Player V6 - Google Drive Sync</title>
     
     <style>
         * { 
@@ -703,6 +704,19 @@
         const { useState, useEffect, useRef } = React;
         const PRIMARY = '#1DB954';
 
+        // ============================================
+        // GOOGLE DRIVE CONFIGURATION
+        // ============================================
+        
+        const GOOGLE_CONFIG = {
+            CLIENT_ID: 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com',
+            API_KEY: 'YOUR_API_KEY_HERE',
+            DISCOVERY_DOCS: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+            SCOPES: 'https://www.googleapis.com/auth/drive.file'
+        };
+
+        let gapiInitialized = false;
+
         // Debug logging helper
         const debugLog = (message, data) => {
             console.log(`[MusicPlayer] ${message}`, data || '');
@@ -944,6 +958,239 @@
             }
         };
 
+        // ============================================
+        // GOOGLE DRIVE API FUNCTIONS
+        // ============================================
+        
+        async function initGoogleDrive() {
+            if (gapiInitialized) return true;
+            
+            return new Promise((resolve, reject) => {
+                debugLog('Initializing Google Drive API...');
+                
+                if (!window.gapi) {
+                    debugLog('ERROR: gapi not loaded');
+                    reject(new Error('Google API not loaded'));
+                    return;
+                }
+                
+                gapi.load('client:auth2', async () => {
+                    try {
+                        await gapi.client.init({
+                            apiKey: GOOGLE_CONFIG.API_KEY,
+                            clientId: GOOGLE_CONFIG.CLIENT_ID,
+                            discoveryDocs: GOOGLE_CONFIG.DISCOVERY_DOCS,
+                            scope: GOOGLE_CONFIG.SCOPES
+                        });
+                        
+                        gapiInitialized = true;
+                        debugLog('✅ Google Drive API initialized');
+                        resolve(true);
+                    } catch (error) {
+                        debugLog('❌ Init error:', error);
+                        reject(error);
+                    }
+                });
+            });
+        }
+
+        function isSignedIn() {
+            if (!gapiInitialized || !window.gapi || !gapi.auth2) return false;
+            const authInstance = gapi.auth2.getAuthInstance();
+            return authInstance && authInstance.isSignedIn.get();
+        }
+
+        function getAccessToken() {
+            const authInstance = gapi.auth2.getAuthInstance();
+            const user = authInstance.currentUser.get();
+            return user.getAuthResponse().access_token;
+        }
+
+        async function signInGoogle() {
+            try {
+                await initGoogleDrive();
+                const authInstance = gapi.auth2.getAuthInstance();
+                await authInstance.signIn();
+                
+                const user = authInstance.currentUser.get();
+                const profile = user.getBasicProfile();
+                
+                debugLog('✅ Signed in as:', profile.getName());
+                
+                return {
+                    name: profile.getName(),
+                    email: profile.getEmail(),
+                    imageUrl: profile.getImageUrl()
+                };
+            } catch (error) {
+                debugLog('❌ Sign in error:', error);
+                throw error;
+            }
+        }
+
+        async function signOutGoogle() {
+            try {
+                const authInstance = gapi.auth2.getAuthInstance();
+                await authInstance.signOut();
+                debugLog('✅ Signed out');
+            } catch (error) {
+                debugLog('❌ Sign out error:', error);
+            }
+        }
+
+        async function getOrCreateAppFolder() {
+            try {
+                const cached = await DB.get('settings', 'driveFolderId');
+                if (cached?.value) {
+                    debugLog('Using cached folder ID:', cached.value);
+                    return cached.value;
+                }
+                
+                const response = await gapi.client.drive.files.list({
+                    q: "name='MusicPlayer' and mimeType='application/vnd.google-apps.folder' and trashed=false",
+                    fields: 'files(id, name)',
+                    spaces: 'drive'
+                });
+                
+                const folders = response.result.files;
+                
+                if (folders && folders.length > 0) {
+                    const folderId = folders[0].id;
+                    debugLog('Found existing folder:', folderId);
+                    await DB.save('settings', { key: 'driveFolderId', value: folderId });
+                    return folderId;
+                }
+                
+                const createResponse = await gapi.client.drive.files.create({
+                    resource: {
+                        name: 'MusicPlayer',
+                        mimeType: 'application/vnd.google-apps.folder'
+                    },
+                    fields: 'id, name'
+                });
+                
+                const folderId = createResponse.result.id;
+                debugLog('Created new folder:', folderId);
+                await DB.save('settings', { key: 'driveFolderId', value: folderId });
+                
+                return folderId;
+            } catch (error) {
+                debugLog('❌ Folder error:', error);
+                throw error;
+            }
+        }
+
+        async function listDriveFiles() {
+            try {
+                const folderId = await getOrCreateAppFolder();
+                
+                const response = await gapi.client.drive.files.list({
+                    q: `'${folderId}' in parents and trashed=false`,
+                    pageSize: 1000,
+                    fields: 'files(id, name, size, mimeType, modifiedTime)'
+                });
+                
+                const files = response.result.files || [];
+                debugLog(`Found ${files.length} files in Drive`);
+                
+                return files;
+            } catch (error) {
+                debugLog('❌ List files error:', error);
+                throw error;
+            }
+        }
+
+        async function uploadToDrive(blob, fileName) {
+            try {
+                const folderId = await getOrCreateAppFolder();
+                
+                const metadata = {
+                    name: fileName,
+                    mimeType: blob.type,
+                    parents: [folderId]
+                };
+                
+                const formData = new FormData();
+                formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                formData.append('file', blob);
+                
+                const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${getAccessToken()}`
+                    },
+                    body: formData
+                });
+                
+                const result = await response.json();
+                debugLog('✅ Uploaded:', result.name);
+                
+                return result;
+            } catch (error) {
+                debugLog('❌ Upload error:', error);
+                throw error;
+            }
+        }
+
+        async function downloadFromDrive(fileId) {
+            try {
+                const response = await fetch(
+                    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${getAccessToken()}`
+                        }
+                    }
+                );
+                
+                const blob = await response.blob();
+                debugLog('✅ Downloaded file:', fileId);
+                
+                return blob;
+            } catch (error) {
+                debugLog('❌ Download error:', error);
+                throw error;
+            }
+        }
+
+        async function trackQuotaUsage(apiCalls) {
+            const syncHistory = await DB.get('settings', 'syncHistory') || {
+                value: {
+                    dailyCalls: 0,
+                    totalCalls: 0,
+                    lastReset: Date.now(),
+                    history: []
+                }
+            };
+            
+            const { dailyCalls, totalCalls, lastReset, history } = syncHistory.value;
+            
+            const daysSinceReset = (Date.now() - lastReset) / (1000 * 60 * 60 * 24);
+            
+            const newData = {
+                dailyCalls: daysSinceReset >= 1 ? apiCalls : dailyCalls + apiCalls,
+                totalCalls: totalCalls + apiCalls,
+                lastReset: daysSinceReset >= 1 ? Date.now() : lastReset,
+                history: [
+                    ...history.slice(-30),
+                    {
+                        timestamp: Date.now(),
+                        calls: apiCalls,
+                        date: new Date().toLocaleDateString()
+                    }
+                ]
+            };
+            
+            await DB.save('settings', {
+                key: 'syncHistory',
+                value: newData
+            });
+            
+            debugLog(`📊 Quota: +${apiCalls} calls today (total: ${newData.dailyCalls})`);
+            
+            return newData;
+        }
+
         function MusicPlayer() {
             const [playlists, setPlaylists] = useState([]);
             const [activePlaylist, setActivePlaylist] = useState(null);
@@ -970,6 +1217,13 @@
             const [editingPlaylistName, setEditingPlaylistName] = useState('');
             const [editingSong, setEditingSong] = useState(null);
             const [editingSongName, setEditingSongName] = useState('');
+            
+            // Google Drive sync states
+            const [isSignedIn, setIsSignedIn] = useState(false);
+            const [userInfo, setUserInfo] = useState(null);
+            const [syncing, setSyncing] = useState(false);
+            const [syncStatus, setSyncStatus] = useState('');
+            const [lastSync, setLastSync] = useState(null);
             
             const audioRef = useRef(null);
             const fileInputRef = useRef(null);
@@ -1023,8 +1277,36 @@
 
             // FIXED: Load data with proper async/await
             useEffect(() => { 
-                loadData(); 
+                loadData();
+                initializeGoogleDrive();
             }, []);
+
+            async function initializeGoogleDrive() {
+                try {
+                    await initGoogleDrive();
+                    
+                    if (isSignedIn()) {
+                        const authInstance = gapi.auth2.getAuthInstance();
+                        const user = authInstance.currentUser.get();
+                        const profile = user.getBasicProfile();
+                        
+                        setUserInfo({
+                            name: profile.getName(),
+                            email: profile.getEmail(),
+                            imageUrl: profile.getImageUrl()
+                        });
+                        setIsSignedIn(true);
+                        
+                        debugLog('✅ Already signed in:', profile.getName());
+                        
+                        // Load last sync info
+                        const sync = await DB.get('settings', 'lastSync');
+                        if (sync) setLastSync(sync.value);
+                    }
+                } catch (error) {
+                    debugLog('Drive init error:', error);
+                }
+            }
 
             const loadData = async () => {
                 try {
@@ -1274,6 +1556,143 @@
                 setShowModal(null);
                 
                 debugLog('URL added and saved');
+            };
+
+            // ============================================
+            // GOOGLE DRIVE SYNC FUNCTION
+            // ============================================
+            
+            const handleSync = async () => {
+                if (!isSignedIn) {
+                    alert('Please sign in with Google first');
+                    return;
+                }
+                
+                setSyncing(true);
+                setSyncStatus('Starting sync...');
+                
+                let totalApiCalls = 0;
+                
+                try {
+                    // Step 1: List Drive files
+                    setSyncStatus('Checking Drive...');
+                    
+                    const driveFiles = await listDriveFiles();
+                    totalApiCalls++; // List call
+                    
+                    // Step 2: Get local files
+                    setSyncStatus('Checking local files...');
+                    const localSongs = await DB.getAll('songs');
+                    
+                    // Step 3: Create lookup maps
+                    const driveMap = new Map(driveFiles.map(f => [f.name, f]));
+                    const localMap = new Map(localSongs.map(s => [s.name, s]));
+                    const localByDriveId = new Map(
+                        localSongs
+                            .filter(s => s.driveFileId)
+                            .map(s => [s.driveFileId, s])
+                    );
+                    
+                    // Step 4: Upload phase
+                    setSyncStatus('Uploading new songs...');
+                    let uploaded = 0;
+                    
+                    for (const localSong of localSongs) {
+                        // Skip if already has Drive ID
+                        if (localSong.driveFileId) {
+                            continue;
+                        }
+                        
+                        // Check if exists in Drive by name
+                        const driveMatch = driveMap.get(localSong.name);
+                        
+                        if (driveMatch) {
+                            // Link them
+                            localSong.driveFileId = driveMatch.id;
+                            localSong.syncedAt = Date.now();
+                            await DB.save('songs', localSong);
+                        } else {
+                            // Upload
+                            const result = await uploadToDrive(localSong.blob, localSong.name);
+                            totalApiCalls++;
+                            
+                            localSong.driveFileId = result.id;
+                            localSong.syncedAt = Date.now();
+                            await DB.save('songs', localSong);
+                            
+                            uploaded++;
+                        }
+                    }
+                    
+                    // Step 5: Download phase
+                    setSyncStatus('Downloading new songs...');
+                    let downloaded = 0;
+                    
+                    for (const driveFile of driveFiles) {
+                        // Skip if already have
+                        if (localByDriveId.has(driveFile.id)) {
+                            continue;
+                        }
+                        
+                        // Check by name
+                        const nameMatch = localMap.get(driveFile.name);
+                        
+                        if (nameMatch) {
+                            // Link them
+                            nameMatch.driveFileId = driveFile.id;
+                            nameMatch.syncedAt = Date.now();
+                            await DB.save('songs', nameMatch);
+                        } else {
+                            // Download
+                            const blob = await downloadFromDrive(driveFile.id);
+                            totalApiCalls++;
+                            
+                            await DB.save('songs', {
+                                id: Date.now() + Math.random(),
+                                name: driveFile.name,
+                                blob: blob,
+                                driveFileId: driveFile.id,
+                                syncedAt: Date.now(),
+                                isUrl: false
+                            });
+                            
+                            downloaded++;
+                        }
+                    }
+                    
+                    // Track quota
+                    await trackQuotaUsage(totalApiCalls);
+                    
+                    // Save sync info
+                    const syncInfo = {
+                        timestamp: Date.now(),
+                        uploaded,
+                        downloaded,
+                        apiCalls: totalApiCalls
+                    };
+                    
+                    await DB.save('settings', {
+                        key: 'lastSync',
+                        value: syncInfo
+                    });
+                    
+                    setLastSync(syncInfo);
+                    
+                    setSyncStatus(`✅ Synced! ⬆️  ${uploaded} ⬇️  ${downloaded}`);
+                    
+                    // Reload data
+                    await loadData();
+                    
+                    setTimeout(() => {
+                        setSyncing(false);
+                        setSyncStatus('');
+                    }, 2000);
+                    
+                } catch (error) {
+                    debugLog('Sync error:', error);
+                    setSyncStatus('❌ Sync failed: ' + error.message);
+                    setTimeout(() => setSyncing(false), 3000);
+                }
             };
 
             const playSong = async (song, pid) => {
@@ -1798,96 +2217,109 @@
                     React.createElement('div', { 
                         className: `sidebar ${sidebar} ${sidebarOpen ? 'open' : ''}` 
                     },
-                        // Header with theme toggle
-                        React.createElement('div', { 
-                            className: 'flex items-center justify-between' 
-                        },
-                            React.createElement('button', {
-                                onClick: goToHome,
-                                className: 'btn-secondary',
-                                style: { display: 'flex', alignItems: 'center', gap: '8px' }
-                            },
-                                React.createElement(Icons.Home),
-                                React.createElement('span', {}, 'Home')
+                        // Account Section with Theme Toggle
+                        isSignedIn ? 
+                            // SIGNED IN VIEW
+                            React.createElement('div', { className: `${card}`, style: { padding: '16px', marginBottom: '20px' } },
+                                // User info with theme toggle on right
+                                React.createElement('div', { 
+                                    style: { display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '16px' }
+                                },
+                                    React.createElement('img', { 
+                                        src: userInfo.imageUrl,
+                                        alt: userInfo.name,
+                                        style: { width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0 }
+                                    }),
+                                    React.createElement('div', { style: { flex: 1, minWidth: 0 } },
+                                        React.createElement('div', { 
+                                            style: { fontWeight: 'bold', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+                                        }, userInfo.name),
+                                        React.createElement('div', { 
+                                            style: { fontSize: '12px', color: darkMode ? '#b3b3b3' : '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+                                        }, userInfo.email)
+                                    ),
+                                    React.createElement('button', {
+                                        onClick: () => setDarkMode(!darkMode),
+                                        className: 'icon-btn icon-btn-small',
+                                        style: { flexShrink: 0 },
+                                        'aria-label': 'Toggle theme'
+                                    }, darkMode ? React.createElement(Icons.Sun) : React.createElement(Icons.Moon))
+                                ),
+                                // Sync button
+                                React.createElement('button', {
+                                    onClick: handleSync,
+                                    disabled: syncing,
+                                    className: 'btn-primary',
+                                    style: { width: '100%', marginBottom: '8px' }
+                                }, syncing ? syncStatus : '🔄 Sync Now'),
+                                // Last sync info
+                                lastSync && React.createElement('div', { 
+                                    style: { fontSize: '12px', textAlign: 'center', color: darkMode ? '#b3b3b3' : '#666' }
+                                }, `Last sync: ${Math.floor((Date.now() - lastSync.timestamp) / 60000)} min ago`)
+                            ) :
+                            // GUEST MODE VIEW
+                            React.createElement('div', { className: `${card}`, style: { padding: '16px', marginBottom: '20px' } },
+                                React.createElement('div', { 
+                                    style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }
+                                },
+                                    React.createElement('div', { style: { fontSize: '32px', lineHeight: '1' } }, '🔄'),
+                                    React.createElement('button', {
+                                        onClick: () => setDarkMode(!darkMode),
+                                        className: 'icon-btn icon-btn-small',
+                                        style: { flexShrink: 0 },
+                                        'aria-label': 'Toggle theme'
+                                    }, darkMode ? React.createElement(Icons.Sun) : React.createElement(Icons.Moon))
+                                ),
+                                React.createElement('div', { 
+                                    style: { fontWeight: 'bold', fontSize: '15px', marginBottom: '8px' }
+                                }, 'Sync Across Devices'),
+                                React.createElement('div', { 
+                                    style: { fontSize: '13px', lineHeight: '1.4', color: darkMode ? '#b3b3b3' : '#666', marginBottom: '16px' }
+                                }, 'Sign in to sync your music library across all your devices'),
+                                React.createElement('button', {
+                                    onClick: async () => {
+                                        try {
+                                            const user = await signInGoogle();
+                                            setUserInfo(user);
+                                            setIsSignedIn(true);
+                                        } catch (e) {
+                                            alert('Sign in failed: ' + e.message);
+                                        }
+                                    },
+                                    className: 'btn-primary',
+                                    style: { width: '100%' }
+                                }, '🔐 Sign in with Google')
                             ),
-                            React.createElement('button', {
-                                onClick: () => setDarkMode(!darkMode),
-                                className: `icon-btn icon-btn-small`,
-                                'aria-label': 'Toggle theme'
-                            }, darkMode ? React.createElement(Icons.Sun) : React.createElement(Icons.Moon))
-                        ),
                         
-                        React.createElement('button', { 
-                            onClick: createPlaylist, 
-                            className: 'btn-primary' 
-                        }, 'Create Playlist'),
-                        
-                        React.createElement('button', { 
-                            onClick: () => setShowModal('export'), 
-                            className: 'btn-secondary',
-                                style: { color: darkMode ? '#ffffff' : '#000000' }
-                        }, 'Backup & Share'),
-                        
-                        // Search
-                        React.createElement('input', {
-                            type: 'search',
-                            placeholder: 'Search...',
-                            value: searchQuery,
-                            onChange: (e) => setSearchQuery(e.target.value)
+                        // Divider
+                        React.createElement('div', { 
+                            style: { height: '1px', background: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)', marginBottom: '20px' }
                         }),
                         
-                        // Playlist list
-                        React.createElement('div', { style: { flex: 1, overflowY: 'auto' } },
+                        // Library Stats
+                        React.createElement('div', null,
                             React.createElement('div', { 
-                                className: `text-xs font-bold mb-2`, 
-                                style: { 
-                                    textTransform: 'uppercase', 
-                                    letterSpacing: '0.05em',
-                                    color: '#b3b3b3'
-                                } 
-                            }, 'Your Library'),
-                            
-                            filtered.length === 0 && React.createElement('div', {
-                                className: `text-sm ${txtMuted}`,
-                                style: { padding: '20px 0', textAlign: 'center' }
-                            }, searchQuery ? 'No results found' : 'No playlists yet'),
-                            
-                            filtered.map((p, index) => React.createElement('div', {
-                                key: p.id,
-                                draggable: true,
-                                onDragStart: (e) => handlePlaylistDragStart(e, index),
-                                onDragOver: (e) => handlePlaylistDragOver(e, index),
-                                onDragEnd: handlePlaylistDragEnd,
-                                className: `playlist-item ${card} ${activePlaylist === p.id ? 'active' : ''} ${draggedPlaylist === index ? 'dragging' : ''}`,
-                                style: { position: 'relative' }
+                                style: { fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: darkMode ? '#b3b3b3' : '#666', marginBottom: '12px' }
+                            }, '📊 Your Collection'),
+                            React.createElement('div', { style: { fontSize: '14px', lineHeight: '2' } },
+                                React.createElement('div', null, `• ${playlists.length} playlists`),
+                                React.createElement('div', null, `• ${playlists.reduce((sum, p) => sum + p.songs.length, 0)} songs`)
+                            )
+                        ),
+                        
+                        // Sign Out Button (if signed in)
+                        isSignedIn && React.createElement('button', {
+                            onClick: async () => {
+                                if (confirm('Sign out? Your music will stay on this device.')) {
+                                    await signOutGoogle();
+                                    setIsSignedIn(false);
+                                    setUserInfo(null);
+                                    setLastSync(null);
+                                }
                             },
-                                React.createElement('div', { className: 'drag-handle' }, React.createElement(Icons.GripVertical)),
-                                React.createElement('div', { 
-                                    style: { flex: 1, minWidth: 0 },
-                                    onClick: () => openPlaylist(p.id)
-                                },
-                                    React.createElement('div', { 
-                                        className: 'font-bold truncate', 
-                                        style: { color: activePlaylist === p.id && view === 'playlist' ? PRIMARY : (darkMode ? '#ffffff' : '#000000') }
-                                    }, p.name),
-                                    React.createElement('div', { 
-                                        className: 'text-sm',
-                                        style: { color: darkMode ? '#b3b3b3' : '#666666' }
-                                    }, `${p.songs.length} tracks`)
-                                ),
-                                React.createElement('button', {
-                                    className: 'icon-btn icon-btn-small',
-                                    onClick: (e) => {
-                                        e.stopPropagation();
-                                        setContextMenu({
-                                            x: e.clientX,
-                                            y: e.clientY,
-                                            playlist: p
-                                        });
-                                    }
-                                }, React.createElement(Icons.MoreVertical))
-                            ))
-                        )
+                            className: 'btn-secondary',
+                            style: { width: '100%', marginTop: '20px' }
+                        }, '🚪 Sign Out')
                     ),
                     
                     // Main Content Area
