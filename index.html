@@ -1799,11 +1799,21 @@
                     React.createElement('div', { 
                         className: `sidebar ${sidebar} ${sidebarOpen ? 'open' : ''}` 
                     },
-                        // Sign-in button and theme toggle on same line
+                        // Guest Mode card
                         React.createElement('div', { className: `${card}`, style: { padding: '16px' } },
-                            React.createElement('div', { className: 'flex items-center gap-3 mb-4' },
-                                React.createElement('button', { 
-                                    onClick: () => {
+                            // Title + theme toggle on same line
+                            React.createElement('div', { className: 'flex items-center justify-between mb-4' },
+                                React.createElement('div', { style: { fontSize: '16px', fontWeight: '600' } }, 'Guest Mode'),
+                                React.createElement('button', {
+                                    onClick: () => setDarkMode(!darkMode),
+                                    className: `icon-btn icon-btn-small`,
+                                    'aria-label': 'Toggle theme'
+                                }, darkMode ? React.createElement(Icons.Sun) : React.createElement(Icons.Moon))
+                            ),
+                            
+                            // Full-width sign-in button
+                            React.createElement('button', { 
+                                onClick: () => {
                                         google.accounts.id.initialize({
                                             client_id: '806582188876-ein8g451k0lorgsn3gja2gp53tqmmcqq.apps.googleusercontent.com',
                                             callback: (response) => {
@@ -1819,20 +1829,11 @@
                                         
                                         google.accounts.id.prompt(); // Show sign-in popup
                                     },          
-                                    className: 'btn-primary',
-                                    style: { flex: 1, fontSize: '13px', padding: '12px 20px', whiteSpace: 'nowrap' }
-                                }, 'Sign in with Google Drive'),
-                                React.createElement('button', {
-                                    onClick: () => setDarkMode(!darkMode),
-                                    className: `icon-btn`,
-                                    'aria-label': 'Toggle theme',
-                                    style: { 
-                                        background: darkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
-                                        border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)'}`,
-                                        flexShrink: 0
-                                    }
-                                }, darkMode ? React.createElement(Icons.Sun) : React.createElement(Icons.Moon))
-                            ),
+                                className: 'btn-primary',
+                                style: { width: '100%', fontSize: '13px', padding: '12px 20px', marginBottom: '12px' }
+                            }, 'Sign in with Google Drive'),
+                            
+                            // Description below
                             React.createElement('div', { style: { fontSize: '14px', lineHeight: '1.5', textAlign: 'center', opacity: 0.8 } }, 
                                 'Sign in to sync your music library across all devices'
                             )
