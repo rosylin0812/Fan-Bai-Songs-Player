@@ -1933,29 +1933,15 @@
                             )
                         ) : (
                             React.createElement('div', { className: `guest-cta ${card}` },
-                                React.createElement('div', { style: { fontSize: '32px', marginBottom: '12px' } }, '☁️'),
-                                React.createElement('div', { className: 'guest-cta-title' }, 'Sync Across Devices'),
-                                React.createElement('div', { className: 'guest-cta-desc' }, 
+                                React.createElement('div', { className: 'guest-cta-title', style: { fontSize: '18px', fontWeight: '700' } }, 'Sync Across Devices'),
+                                React.createElement('div', { className: 'guest-cta-desc', style: { fontSize: '14px', lineHeight: '1.5' } }, 
                                     'Sign in to sync your music library across all devices'
                                 ),
                                 React.createElement('button', { 
                                     onClick: handleSignIn,
                                     className: 'btn-primary',
-                                    style: { width: '100%' }
+                                    style: { width: '100%', fontSize: '13px', padding: '12px 20px' }
                                 }, 'Sign in with Google Drive')
-                            )
-                        ),
-                        
-                        // Library Stats
-                        React.createElement('div', { className: `library-stats ${card}` },
-                            React.createElement('div', { className: 'stats-title' }, '📊 Your Collection'),
-                            React.createElement('div', { className: 'stat-item' },
-                                React.createElement('span', { className: 'stat-label' }, 'Playlists'),
-                                React.createElement('span', { className: 'stat-value' }, playlists.length)
-                            ),
-                            React.createElement('div', { className: 'stat-item' },
-                                React.createElement('span', { className: 'stat-label' }, 'Songs'),
-                                React.createElement('span', { className: 'stat-value' }, totalSongs)
                             )
                         )
                     ),
@@ -1981,21 +1967,35 @@
                                 className: 'mb-8',
                                 style: { display: view === 'home' ? 'block' : 'none' }
                             },
+                                // Search Bar
+                                React.createElement('input', {
+                                    type: 'search',
+                                    placeholder: 'Search playlists or songs...',
+                                    value: searchQuery,
+                                    onChange: (e) => setSearchQuery(e.target.value),
+                                    style: { marginBottom: '24px' }
+                                }),
+                                
                                 React.createElement('div', { 
                                     className: 'text-2xl font-bold mb-4',
                                     className: 'text-color'
                                 }, 'Your Playlists'),
                                 React.createElement('div', { className: 'playlist-grid' },
-                                    playlists.map(p => React.createElement('div', {
+                                    filtered.map((p, index) => React.createElement('div', {
                                         key: p.id,
+                                        draggable: true,
+                                        onDragStart: (e) => handlePlaylistDragStart(e, index),
+                                        onDragOver: (e) => handlePlaylistDragOver(e, index),
+                                        onDragEnd: handlePlaylistDragEnd,
                                         onClick: () => openPlaylist(p.id),
-                                        className: `playlist-grid-card ${card}`,
+                                        className: `playlist-grid-card ${card} ${draggedPlaylist === index ? 'dragging' : ''}`,
                                         style: { 
                                             ...(activePlaylist === p.id ? { 
                                                 borderColor: PRIMARY,
                                                 borderWidth: '2px',
                                                 borderStyle: 'solid'
-                                            } : {})
+                                            } : {}),
+                                            cursor: 'grab'
                                         }
                                     },
                                         React.createElement('button', {
