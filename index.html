@@ -1143,8 +1143,39 @@
 
             // V6 NEW: Sync handlers
             const handleSignIn = async () => {
-                // Stub - shows alert since we don't have Google credentials yet
-                alert('Google Drive sync requires API credentials.\n\nTo enable sync:\n1. Get credentials from https://console.cloud.google.com/\n2. Replace GOOGLE_CONFIG in the code\n3. Implement OAuth flow\n\nFor now, you can use all features offline!');
+                // TO ENABLE REAL SYNC:
+                // 1. Go to https://console.cloud.google.com/
+                // 2. Create a project
+                // 3. Enable Google Drive API
+                // 4. Create OAuth 2.0 credentials
+                // 5. Add your domain to authorized origins
+                // 6. Replace the code below with real Google Sign-In
+                
+                alert(`🔐 Google Drive Sync Setup Required
+
+To enable sync, you need to:
+
+1️⃣ Create a Google Cloud Project
+   → https://console.cloud.google.com/
+
+2️⃣ Enable Google Drive API
+   → APIs & Services > Library > Google Drive API
+
+3️⃣ Create OAuth Client ID
+   → APIs & Services > Credentials
+   → Application type: Web application
+   → Add your Vercel URL to authorized origins
+
+4️⃣ Get your Client ID
+   → Copy the Client ID from credentials
+
+5️⃣ Add the Google API script to your HTML:
+   <script src="https://accounts.google.com/gsi/client"></script>
+
+6️⃣ Implement the sign-in (see SYNC-IMPLEMENTATION-GUIDE.md)
+
+✅ For now: All features work offline!
+📤 You can still export/import playlists manually.`);
                 return false;
             };
             
@@ -1879,18 +1910,6 @@
                     React.createElement('div', { 
                         className: `sidebar ${sidebar} ${sidebarOpen ? 'open' : ''}` 
                     },
-                        // Header with theme toggle only
-                        React.createElement('div', { 
-                            className: 'flex items-center justify-between mb-4' 
-                        },
-                            React.createElement('div', { style: { fontSize: '20px', fontWeight: '700' } }, '🎵'),
-                            React.createElement('button', {
-                                onClick: () => setDarkMode(!darkMode),
-                                className: `icon-btn icon-btn-small`,
-                                'aria-label': 'Toggle theme'
-                            }, darkMode ? React.createElement(Icons.Sun) : React.createElement(Icons.Moon))
-                        ),
-                        
                         // User Profile / Guest CTA
                         isSignedIn ? (
                             React.createElement('div', { className: `user-profile ${card}` },
@@ -1933,15 +1952,23 @@
                             )
                         ) : (
                             React.createElement('div', { className: `guest-cta ${card}` },
-                                React.createElement('div', { className: 'guest-cta-title', style: { fontSize: '18px', fontWeight: '700' } }, 'Sync Across Devices'),
-                                React.createElement('div', { className: 'guest-cta-desc', style: { fontSize: '14px', lineHeight: '1.5' } }, 
-                                    'Sign in to sync your music library across all devices'
+                                // Sign in button and theme toggle on same line
+                                React.createElement('div', { className: 'flex items-center gap-3 mb-4' },
+                                    React.createElement('button', { 
+                                        onClick: handleSignIn,
+                                        className: 'btn-primary',
+                                        style: { flex: 1, fontSize: '13px', padding: '12px 20px', whiteSpace: 'nowrap' }
+                                    }, 'Sign in with Google Drive'),
+                                    React.createElement('button', {
+                                        onClick: () => setDarkMode(!darkMode),
+                                        className: `icon-btn`,
+                                        'aria-label': 'Toggle theme'
+                                    }, darkMode ? React.createElement(Icons.Sun) : React.createElement(Icons.Moon))
                                 ),
-                                React.createElement('button', { 
-                                    onClick: handleSignIn,
-                                    className: 'btn-primary',
-                                    style: { width: '100%', fontSize: '13px', padding: '12px 20px' }
-                                }, 'Sign in with Google Drive')
+                                // Description below
+                                React.createElement('div', { className: 'guest-cta-desc', style: { fontSize: '14px', lineHeight: '1.5', textAlign: 'center' } }, 
+                                    'Sign in to sync your music library across all devices'
+                                )
                             )
                         )
                     ),
@@ -1973,8 +2000,15 @@
                                     placeholder: 'Search playlists or songs...',
                                     value: searchQuery,
                                     onChange: (e) => setSearchQuery(e.target.value),
-                                    style: { marginBottom: '24px' }
+                                    style: { marginBottom: '16px' }
                                 }),
+                                
+                                // Create New Playlist Button
+                                React.createElement('button', {
+                                    onClick: createPlaylist,
+                                    className: 'btn-primary',
+                                    style: { marginBottom: '24px', width: '100%' }
+                                }, '+ Create New Playlist'),
                                 
                                 React.createElement('div', { 
                                     className: 'text-2xl font-bold mb-4',
