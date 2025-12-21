@@ -964,18 +964,12 @@
             const [draggedPlaylist, setDraggedPlaylist] = useState(null);
             const [draggedSong, setDraggedSong] = useState(null);
             const [recentPlaylistId, setRecentPlaylistId] = useState(null);
+            const [showDebug, setShowDebug] = useState(false);
+            const [debugInfo, setDebugInfo] = useState({});
             const [editingPlaylist, setEditingPlaylist] = useState(null);
             const [editingPlaylistName, setEditingPlaylistName] = useState('');
             const [editingSong, setEditingSong] = useState(null);
             const [editingSongName, setEditingSongName] = useState('');
-            
-            // V6 NEW: Sync-related state
-            const [quota, setQuota] = useState({ dailyCalls: 0 });
-            const [isSignedIn, setIsSignedIn] = useState(false);
-            const [userInfo, setUserInfo] = useState(null);
-            const [syncing, setSyncing] = useState(false);
-            const [showDebug, setShowDebug] = useState(false);
-            const [debugInfo, setDebugInfo] = useState({});
             
             const audioRef = useRef(null);
             const fileInputRef = useRef(null);
@@ -1140,62 +1134,6 @@
             useEffect(() => {
                 if (audioRef.current) audioRef.current.volume = volume / 100;
             }, [volume]);
-
-            // V6 NEW: Sync handlers
-            const handleSignIn = async () => {
-                // TO ENABLE REAL SYNC:
-                // 1. Go to https://console.cloud.google.com/
-                // 2. Create a project
-                // 3. Enable Google Drive API
-                // 4. Create OAuth 2.0 credentials
-                // 5. Add your domain to authorized origins
-                // 6. Replace the code below with real Google Sign-In
-                
-                alert(`🔐 Google Drive Sync Setup Required
-
-To enable sync, you need to:
-
-1️⃣ Create a Google Cloud Project
-   → https://console.cloud.google.com/
-
-2️⃣ Enable Google Drive API
-   → APIs & Services > Library > Google Drive API
-
-3️⃣ Create OAuth Client ID
-   → APIs & Services > Credentials
-   → Application type: Web application
-   → Add your Vercel URL to authorized origins
-
-4️⃣ Get your Client ID
-   → Copy the Client ID from credentials
-
-5️⃣ Add the Google API script to your HTML:
-   <script src="https://accounts.google.com/gsi/client"></script>
-
-6️⃣ Implement the sign-in (see SYNC-IMPLEMENTATION-GUIDE.md)
-
-✅ For now: All features work offline!
-📤 You can still export/import playlists manually.`);
-                return false;
-            };
-            
-            const handleSignOut = async () => {
-                setIsSignedIn(false);
-                setUserInfo(null);
-            };
-            
-            const handleSync = async () => {
-                try {
-                    setSyncing(true);
-                    // Stub - simulate sync
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    alert('Sync is not yet implemented.\n\nThis requires Google API setup.\n\nSee the README for instructions.');
-                } catch (e) {
-                    alert('Sync error: ' + e.message);
-                } finally {
-                    setSyncing(false);
-                }
-            };
 
             const createPlaylist = () => {
                 setModalInput('');
@@ -1511,52 +1449,6 @@ To enable sync, you need to:
                 const sec = Math.floor(s % 60);
                 return `${m}:${sec.toString().padStart(2, '0')}`;
             };
-            
-            // V6 NEW: Get quota level with friendly messages
-            const getQuotaLevel = (calls) => {
-                if (calls === 0) return { 
-                    level: 'excellent', 
-                    icon: '✨', 
-                    message: 'No syncs today yet', 
-                    desc: 'You have plenty of room!', 
-                    percent: 0 
-                };
-                if (calls < 50) return { 
-                    level: 'great', 
-                    icon: '👍', 
-                    message: 'Very light usage', 
-                    desc: "You're doing great!", 
-                    percent: (calls / 50) * 35 
-                };
-                if (calls < 200) return { 
-                    level: 'good', 
-                    icon: '✓', 
-                    message: 'Normal usage', 
-                    desc: 'Everything looks good', 
-                    percent: 35 + ((calls - 50) / 150) * 30 
-                };
-                if (calls < 500) return { 
-                    level: 'moderate', 
-                    icon: '📊', 
-                    message: 'Moderate usage', 
-                    desc: 'Still plenty of room', 
-                    percent: 65 + ((calls - 200) / 300) * 20 
-                };
-                if (calls < 800) return { 
-                    level: 'high', 
-                    icon: '⚠️', 
-                    message: 'High usage today', 
-                    desc: 'Consider syncing less often', 
-                    percent: 85 + ((calls - 500) / 300) * 10 
-                };
-                return { 
-                    level: 'very-high', 
-                    icon: '🔴', 
-                    message: 'Very high usage', 
-                    desc: 'Take a break from syncing', 
-                    percent: Math.min(100, 95 + ((calls - 800) / 200) * 5) 
-                };
-            };
 
             // Drag and drop for playlists
             const handlePlaylistDragStart = (e, index) => {
@@ -1730,10 +1622,6 @@ To enable sync, you need to:
                 p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 p.songs.some(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
             );
-            
-            // V6 NEW: Calculate stats
-            const totalSongs = playlists.reduce((sum, p) => sum + p.songs.length, 0);
-            const quotaLevel = getQuotaLevel(quota.dailyCalls);
 
             // FIXED: Better loading state
             if (loading) {
@@ -1906,69 +1794,26 @@ To enable sync, you need to:
                 
                 // Main Container
                 React.createElement('div', { className: `container ${bg}` },
-                    // Sidebar - V6 REDESIGN (No playlist list, add sync features)
+                    // Sidebar - V6 Simplified
                     React.createElement('div', { 
                         className: `sidebar ${sidebar} ${sidebarOpen ? 'open' : ''}` 
                     },
-                        // User Profile / Guest CTA
-                        isSignedIn ? (
-                            React.createElement('div', { className: `user-profile ${card}` },
-                                React.createElement('div', { className: 'user-info' },
-                                    React.createElement('div', { className: 'user-avatar' },
-                                        userInfo?.name?.charAt(0).toUpperCase() || '👤'
-                                    ),
-                                    React.createElement('div', { className: 'user-details' },
-                                        React.createElement('div', { className: 'user-name' }, userInfo?.name || 'User'),
-                                        React.createElement('div', { className: 'user-email' }, userInfo?.email || '')
-                                    )
-                                ),
+                        // Sign-in button and theme toggle on same line
+                        React.createElement('div', { className: `${card}`, style: { padding: '16px' } },
+                            React.createElement('div', { className: 'flex items-center gap-3 mb-4' },
                                 React.createElement('button', { 
-                                    onClick: handleSync,
-                                    disabled: syncing,
+                                    onClick: () => alert('Google Drive Sync Setup Required\n\nSee ENABLE-SYNC-GUIDE.md for setup instructions.\n\nAll features work offline!'),
                                     className: 'btn-primary',
-                                    style: { width: '100%' }
-                                }, syncing ? 'Syncing...' : '🔄 Sync Now'),
-                                
-                                React.createElement('div', { className: 'quota-monitor' },
-                                    React.createElement('div', { className: 'quota-header' },
-                                        React.createElement('div', { className: 'quota-title' }, "Today's Activity")
-                                    ),
-                                    React.createElement('div', { className: 'quota-bar' },
-                                        React.createElement('div', { 
-                                            className: `quota-fill ${quotaLevel.level}`,
-                                            style: { width: `${quotaLevel.percent}%` }
-                                        })
-                                    ),
-                                    React.createElement('div', { className: 'quota-status' },
-                                        React.createElement('span', {}, quotaLevel.icon),
-                                        React.createElement('span', {}, quotaLevel.message)
-                                    ),
-                                    React.createElement('div', { className: 'quota-description' }, quotaLevel.desc),
-                                    React.createElement('button', {
-                                        className: 'quota-help-btn',
-                                        onClick: () => setShowModal('quota-help')
-                                    }, 'What does this mean?')
-                                )
-                            )
-                        ) : (
-                            React.createElement('div', { className: `guest-cta ${card}` },
-                                // Sign in button and theme toggle on same line
-                                React.createElement('div', { className: 'flex items-center gap-3 mb-4' },
-                                    React.createElement('button', { 
-                                        onClick: handleSignIn,
-                                        className: 'btn-primary',
-                                        style: { flex: 1, fontSize: '13px', padding: '12px 20px', whiteSpace: 'nowrap' }
-                                    }, 'Sign in with Google Drive'),
-                                    React.createElement('button', {
-                                        onClick: () => setDarkMode(!darkMode),
-                                        className: `icon-btn`,
-                                        'aria-label': 'Toggle theme'
-                                    }, darkMode ? React.createElement(Icons.Sun) : React.createElement(Icons.Moon))
-                                ),
-                                // Description below
-                                React.createElement('div', { className: 'guest-cta-desc', style: { fontSize: '14px', lineHeight: '1.5', textAlign: 'center' } }, 
-                                    'Sign in to sync your music library across all devices'
-                                )
+                                    style: { flex: 1, fontSize: '13px', padding: '12px 20px', whiteSpace: 'nowrap' }
+                                }, 'Sign in with Google Drive'),
+                                React.createElement('button', {
+                                    onClick: () => setDarkMode(!darkMode),
+                                    className: `icon-btn`,
+                                    'aria-label': 'Toggle theme'
+                                }, darkMode ? React.createElement(Icons.Sun) : React.createElement(Icons.Moon))
+                            ),
+                            React.createElement('div', { style: { fontSize: '14px', lineHeight: '1.5', textAlign: 'center', opacity: 0.8 } }, 
+                                'Sign in to sync your music library across all devices'
                             )
                         )
                     ),
@@ -2449,49 +2294,6 @@ To enable sync, you need to:
                                 } 
                             }, 'Delete')
                         )
-                    )
-                ),
-                
-                // V6 NEW: Quota Help Modal
-                showModal === 'quota-help' && React.createElement('div', { 
-                    className: 'modal-overlay',
-                    onClick: (e) => {
-                        if (e.target === e.currentTarget) setShowModal(null);
-                    }
-                },
-                    React.createElement('div', { className: `modal ${modalClass}` },
-                        React.createElement('div', { 
-                            className: 'text-2xl font-bold mb-4' 
-                        }, 'About Sync Activity'),
-                        React.createElement('div', { className: 'mb-4' },
-                            React.createElement('strong', {}, 'What is this?'),
-                            React.createElement('div', { style: { opacity: 0.8, marginTop: '4px' } }, 
-                                `This shows how many times you've synced today. Current: ${quota.dailyCalls} syncs.`
-                            )
-                        ),
-                        React.createElement('div', { className: 'mb-4' },
-                            React.createElement('strong', {}, 'Why does it matter?'),
-                            React.createElement('div', { style: { opacity: 0.8, marginTop: '4px' } }, 
-                                "Google has fair use limits. Normal usage is 1-5 syncs per day."
-                            )
-                        ),
-                        React.createElement('div', { className: 'mb-4' },
-                            React.createElement('strong', {}, 'What if I see a warning?'),
-                            React.createElement('div', { style: { opacity: 0.8, marginTop: '4px' } }, 
-                                "Wait before syncing again. The counter resets at midnight."
-                            )
-                        ),
-                        React.createElement('div', { className: 'mb-6' },
-                            React.createElement('strong', {}, 'Tip:'),
-                            React.createElement('div', { style: { opacity: 0.8, marginTop: '4px' } }, 
-                                "Add several songs, then sync once instead of syncing after each song."
-                            )
-                        ),
-                        React.createElement('button', { 
-                            onClick: () => setShowModal(null), 
-                            className: 'btn-primary',
-                            style: { width: '100%' }
-                        }, 'Got it!')
                     )
                 ),
                 
