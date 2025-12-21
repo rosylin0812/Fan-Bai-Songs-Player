@@ -974,16 +974,8 @@
             const [isSignedIn, setIsSignedIn] = useState(false);
             const [userInfo, setUserInfo] = useState(null);
             const [syncing, setSyncing] = useState(false);
-            const [contextMenu, setContextMenu] = useState(null);
-            const [draggedPlaylist, setDraggedPlaylist] = useState(null);
-            const [draggedSong, setDraggedSong] = useState(null);
-            const [recentPlaylistId, setRecentPlaylistId] = useState(null);
             const [showDebug, setShowDebug] = useState(false);
             const [debugInfo, setDebugInfo] = useState({});
-            const [editingPlaylist, setEditingPlaylist] = useState(null);
-            const [editingPlaylistName, setEditingPlaylistName] = useState('');
-            const [editingSong, setEditingSong] = useState(null);
-            const [editingSongName, setEditingSongName] = useState('');
             
             const audioRef = useRef(null);
             const fileInputRef = useRef(null);
