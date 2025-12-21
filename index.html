@@ -1809,7 +1809,12 @@
                                 React.createElement('button', {
                                     onClick: () => setDarkMode(!darkMode),
                                     className: `icon-btn`,
-                                    'aria-label': 'Toggle theme'
+                                    'aria-label': 'Toggle theme',
+                                    style: { 
+                                        background: darkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+                                        border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)'}`,
+                                        flexShrink: 0
+                                    }
                                 }, darkMode ? React.createElement(Icons.Sun) : React.createElement(Icons.Moon))
                             ),
                             React.createElement('div', { style: { fontSize: '14px', lineHeight: '1.5', textAlign: 'center', opacity: 0.8 } }, 
