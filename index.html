@@ -692,6 +692,7 @@
             to { transform: rotate(360deg); }
         }
     </style>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
     <div id="root"></div>
@@ -1802,7 +1803,22 @@
                         React.createElement('div', { className: `${card}`, style: { padding: '16px' } },
                             React.createElement('div', { className: 'flex items-center gap-3 mb-4' },
                                 React.createElement('button', { 
-                                    onClick: () => alert('Google Drive Sync Setup Required\n\nSee ENABLE-SYNC-GUIDE.md for setup instructions.\n\nAll features work offline!'),
+                                    onClick: () => {
+                                        google.accounts.id.initialize({
+                                            client_id: '806582188876-ein8g451k0lorgsn3gja2gp53tqmmcqq.apps.googleusercontent.com',
+                                            callback: (response) => {
+                                                // Decode the JWT token to get user info
+                                                const decoded = JSON.parse(atob(response.credential.split('.')[1]));
+                                                
+                                                alert(`✅ Signed in successfully!\n\nWelcome ${decoded.name}!\n\nEmail: ${decoded.email}\n\nSync features coming soon...`);
+                                                
+                                                // In future: Save user info, enable sync features
+                                                console.log('User info:', decoded);
+                                            }
+                                        });
+                                        
+                                        google.accounts.id.prompt(); // Show sign-in popup
+                                    },          
                                     className: 'btn-primary',
                                     style: { flex: 1, fontSize: '13px', padding: '12px 20px', whiteSpace: 'nowrap' }
                                 }, 'Sign in with Google Drive'),
