@@ -811,7 +811,7 @@
         const initDB = () => {
             return new Promise((resolve, reject) => {
                 debugLog('Initializing IndexedDB...');
-                const req = indexedDB.open('MusicDB', 2);
+                const req = indexedDB.open('MusicDB', 3);
                 
                 req.onerror = () => {
                     debugLog('IndexedDB error:', req.error);
