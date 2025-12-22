@@ -1207,8 +1207,49 @@
                     setSyncStatus('Downloading playlists from Drive...');
                     const playlistsFile = driveFiles.files?.find(f => f.name === 'playlists.json');
                     
-                    // Load deleted items tracking
-                    const deletedData = await DB.get('settings', 'deletedItems') || { key: 'deletedItems', value: { playlists: [], songs: {} } };
+                    // Load deleted items tracking from Drive
+                    let deletedData = await DB.get('settings', 'deletedItems') || { key: 'deletedItems', value: { playlists: [], songs: {} } };
+                    
+                    // Download deleted.json from Drive and merge
+                    const deletedFile = driveFiles.files?.find(f => f.name === 'deleted.json');
+                    if (deletedFile) {
+                        try {
+                            const deletedBlob = await DriveAPI.downloadFile(accessToken, deletedFile.id);
+                            const deletedText = await deletedBlob.text();
+                            const driveDeleted = JSON.parse(deletedText);
+                            
+                            // Merge deletion lists (union of both)
+                            const mergedDeletedPlaylists = [...new Set([
+                                ...(deletedData.value?.playlists || []),
+                                ...(driveDeleted.playlists || [])
+                            ])];
+                            
+                            const mergedDeletedSongs = { ...(deletedData.value?.songs || {}), ...(driveDeleted.songs || {}) };
+                            // Merge song arrays per playlist
+                            Object.keys(driveDeleted.songs || {}).forEach(playlistName => {
+                                if (mergedDeletedSongs[playlistName]) {
+                                    mergedDeletedSongs[playlistName] = [...new Set([
+                                        ...mergedDeletedSongs[playlistName],
+                                        ...driveDeleted.songs[playlistName]
+                                    ])];
+                                } else {
+                                    mergedDeletedSongs[playlistName] = driveDeleted.songs[playlistName];
+                                }
+                            });
+                            
+                            deletedData = {
+                                key: 'deletedItems',
+                                value: {
+                                    playlists: mergedDeletedPlaylists,
+                                    songs: mergedDeletedSongs
+                                }
+                            };
+                            await DB.save('settings', deletedData);
+                        } catch (e) {
+                            console.error('Error loading deleted.json:', e);
+                        }
+                    }
+                    
                     const deletedPlaylists = deletedData.value?.playlists || [];
                     const deletedSongs = deletedData.value?.songs || {};
                     
@@ -1287,8 +1328,7 @@
                         }
                     }
                     
-                    // Clear deletion tracking after successful merge
-                    await DB.save('settings', { key: 'deletedItems', value: { playlists: [], songs: {} } });
+                    // Don't clear deletions yet - upload to Drive first!
                     
                     // STEP 2: Now upload merged playlists metadata to Drive
                     setSyncStatus('Uploading playlist metadata...');
@@ -1318,6 +1358,22 @@
                     }
                     
                     await DriveAPI.uploadFile(accessToken, folderId, 'playlists.json', metadataBlob);
+                    
+                    // Upload deletion tracking to Drive
+                    setSyncStatus('Syncing deletions...');
+                    const deletedBlob = new Blob([JSON.stringify(deletedData.value, null, 2)], { type: 'application/json' });
+                    const existingDeleted = driveFiles.files?.find(f => f.name === 'deleted.json');
+                    if (existingDeleted) {
+                        await fetch(
+                            `https://www.googleapis.com/drive/v3/files/${existingDeleted.id}`,
+                            {
+                                method: 'DELETE',
+                                headers: { 'Authorization': `Bearer ${accessToken}` }
+                            }
+                        );
+                        setQuotaCalls(prev => prev + 1);
+                    }
+                    await DriveAPI.uploadFile(accessToken, folderId, 'deleted.json', deletedBlob);
                     
                     // STEP 3: Upload local songs
                     const localSongs = [];
