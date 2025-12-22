@@ -1043,12 +1043,13 @@
                     setLoading(true);
                     
                     // Wait for all data to load
-                    const [lists, mode, vol, recent, auth] = await Promise.all([
+                    const [lists, mode, vol, recent, auth, quotaData] = await Promise.all([
                         DB.getAll('playlists'),
                         DB.get('settings', 'darkMode'),
                         DB.get('settings', 'volume'),
                         DB.get('settings', 'recentPlaylist'),
-                        DB.get('settings', 'googleAuth')
+                        DB.get('settings', 'googleAuth'),
+                        DB.get('settings', 'quotaTracking')
                     ]);
                     
                     debugLog('Loaded playlists:', lists.length);
@@ -1085,6 +1086,25 @@
                         } else {
                             debugLog('Auth token expired');
                             await DB.delete('settings', 'googleAuth');
+                        }
+                    }
+                    
+                    // Restore quota count (resets daily)
+                    if (quotaData?.value) {
+                        const today = new Date().toDateString();
+                        const { date, count } = quotaData.value;
+                        
+                        if (date === today) {
+                            setQuotaCalls(count);
+                            debugLog('Quota restored:', count);
+                        } else {
+                            // New day - reset to 0
+                            setQuotaCalls(0);
+                            await DB.save('settings', {
+                                key: 'quotaTracking',
+                                value: { date: today, count: 0 }
+                            });
+                            debugLog('Quota reset for new day');
                         }
                     }
                     
@@ -1232,14 +1252,15 @@
                     let uploadCount = 0;
                     
                     for (const song of localSongs) {
+                        const fileName = createFileName(song.name, song.id); // "Song Name-a3f2.mp3"
                         const exists = driveFiles.files?.find(f => 
-                            f.name === `${song.id}.mp3` && 
+                            f.name === fileName && 
                             Math.abs(f.size - song.size) < 1024
                         );
                         
                         if (!exists) {
                             setSyncStatus(`Uploading: ${song.name}...`);
-                            await DriveAPI.uploadFile(accessToken, folderId, `${song.id}.mp3`, song.blob);
+                            await DriveAPI.uploadFile(accessToken, folderId, fileName, song.blob);
                             uploadCount++;
                         }
                     }
@@ -1253,7 +1274,15 @@
                     if (playlistsFile) {
                         const metaBlob = await DriveAPI.downloadFile(accessToken, playlistsFile.id);
                         const metaText = await metaBlob.text();
-                        const drivePlaylists = JSON.parse(metaText);
+                        let drivePlaylists = [];
+                        
+                        try {
+                            const parsed = JSON.parse(metaText);
+                            drivePlaylists = Array.isArray(parsed) ? parsed : [];
+                        } catch (e) {
+                            console.error('Error parsing playlists.json:', e);
+                            drivePlaylists = [];
+                        }
                         
                         // Merge Drive playlists with local
                         const mergedPlaylists = [...playlists];
@@ -1284,8 +1313,9 @@
                                     const hasLocally = await DB.get('songs', driveSong.id);
                                     
                                     if (!hasLocally) {
-                                        // Download from Drive
-                                        const songFile = driveFiles.files?.find(f => f.name === `${driveSong.id}.mp3`);
+                                        // Download from Drive using new filename format
+                                        const fileName = createFileName(driveSong.name, driveSong.id);
+                                        const songFile = driveFiles.files?.find(f => f.name === fileName);
                                         
                                         if (songFile) {
                                             setSyncStatus(`Downloading: ${driveSong.name}...`);
@@ -1411,13 +1441,14 @@
 
                 for (const file of files) {
                     debugLog('Processing file:', file.name);
-                    const id = Date.now() + Math.random();
+                    const shortId = generateShortId(); // Generate 4-char ID
+                    const songName = file.name.replace(/\.[^/.]+$/, '');
                     const song = { 
-                        id, 
-                        name: file.name.replace(/\.[^/.]+$/, ''), 
+                        id: shortId, 
+                        name: songName, 
                         isUrl: false 
                     };
-                    await DB.save('songs', { id, blob: file });
+                    await DB.save('songs', { id: shortId, blob: file });
                     playlist.songs.push(song);
                 }
                 
@@ -1450,7 +1481,7 @@
                 
                 const filename = modalInput.split('/').pop().split('?')[0] || 'Audio';
                 playlist.songs.push({
-                    id: Date.now() + Math.random(),
+                    id: generateShortId(), // Short 4-char ID
                     name: filename.replace(/\.[^/.]+$/, ''),
                     url: modalInput,
                     isUrl: true
@@ -1635,8 +1666,33 @@
 
             // Google Drive API Helpers
             const DriveAPI = {
-                trackCall() {
-                    setQuotaCalls(prev => prev + 1);
+                async trackCall() {
+                    const today = new Date().toDateString();
+                    
+                    // Get stored quota data
+                    const quotaData = await DB.get('settings', 'quotaTracking');
+                    
+                    let currentCount = 1;
+                    
+                    if (quotaData?.value) {
+                        const { date, count } = quotaData.value;
+                        
+                        if (date === today) {
+                            // Same day - increment
+                            currentCount = count + 1;
+                        } else {
+                            // New day - reset to 1
+                            currentCount = 1;
+                        }
+                    }
+                    
+                    // Save updated count
+                    await DB.save('settings', {
+                        key: 'quotaTracking',
+                        value: { date: today, count: currentCount }
+                    });
+                    
+                    setQuotaCalls(currentCount);
                 },
                 
                 async ensureFolder(accessToken) {
@@ -1705,6 +1761,30 @@
                     );
                     return await response.blob();
                 }
+            };
+
+            // Generate short 4-character ID
+            const generateShortId = () => {
+                const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+                let id = '';
+                for (let i = 0; i < 4; i++) {
+                    id += chars[Math.floor(Math.random() * chars.length)];
+                }
+                return id;
+            };
+            
+            // Create filename from song name and ID
+            const createFileName = (songName, songId) => {
+                // Clean song name (remove invalid chars)
+                const cleanName = songName.replace(/[<>:"/\\|?*]/g, '-').trim();
+                return `${cleanName}-${songId}.mp3`;
+            };
+            
+            // Extract song ID from filename
+            const extractIdFromFileName = (fileName) => {
+                // Format: "Song Name-a3f2.mp3"
+                const match = fileName.match(/-([a-z0-9]{4})\.mp3$/i);
+                return match ? match[1] : null;
             };
 
             const formatTime = (s) => {
@@ -2151,7 +2231,7 @@
                                                 setIsSignedIn(true);
                                                 setUserInfo(user);
                                                 setAccessToken(token);
-                                                setQuotaCalls(0); // Reset quota count on fresh sign-in
+                                                // Note: quotaCalls persists from loadData
                                                 
                                                 // Save to IndexedDB
                                                 await DB.save('settings', { 
