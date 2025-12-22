@@ -1187,6 +1187,10 @@
             const handleSync = async () => {
                 if (!accessToken || !isSignedIn) {
                     alert('Please sign in first!');
+            // Sync function - WITH PROPER DELETION TRACKING
+            const handleSync = async () => {
+                if (!accessToken || !isSignedIn) {
+                    alert('Please sign in first!');
                     return;
                 }
                 
@@ -1202,6 +1206,11 @@
                     const driveFiles = await DriveAPI.listFiles(accessToken, folderId);
                     
                     if (cancelSync) throw new Error('Sync cancelled by user');
+                    
+                    // Load deleted items tracking
+                    const deletedData = await DB.get('settings', 'deletedItems') || { value: { playlists: [], songs: {} } };
+                    const deletedPlaylists = deletedData.value.playlists || [];
+                    const deletedSongs = deletedData.value.songs || {};
                     
                     // STEP 1: Download playlists from Drive
                     setSyncStatus('Downloading playlists from Drive...');
@@ -1221,129 +1230,68 @@
                         }
                     }
                     
-                    // Add timestamps to local playlists if they don't have them
-                    const localPlaylists = playlists.map(p => ({
-                        ...p,
-                        lastModified: p.lastModified || Date.now()
-                    }));
+                    // Filter out deleted playlists from Drive
+                    drivePlaylists = drivePlaylists.filter(p => !deletedPlaylists.includes(p.name));
                     
-                    // STEP 2: Smart merge - Use timestamps to resolve conflicts
+                    // STEP 2: Merge playlists
                     setSyncStatus('Merging playlists...');
-                    const mergedPlaylists = [];
-                    const processedDriveIds = new Set();
+                    const mergedPlaylists = [...playlists];
                     let downloadCount = 0;
                     
-                    // First, process local playlists
-                    for (const localPlaylist of localPlaylists) {
-                        const drivePlaylist = drivePlaylists.find(p => p.name === localPlaylist.name);
-                        
-                        if (drivePlaylist) {
-                            processedDriveIds.add(drivePlaylist.name);
-                            
-                            // Both exist - compare timestamps
-                            const driveTime = drivePlaylist.lastModified || 0;
-                            const localTime = localPlaylist.lastModified || 0;
-                            
-                            if (localTime >= driveTime) {
-                                // Local is newer or same - keep local
-                                mergedPlaylists.push({
-                                    ...localPlaylist,
-                                    lastModified: Date.now() // Update timestamp
-                                });
-                            } else {
-                                // Drive is newer - use Drive version and download songs
-                                const newPlaylist = {
-                                    id: localPlaylist.id,
-                                    name: drivePlaylist.name,
-                                    songs: [],
-                                    lastModified: Date.now()
-                                };
-                                
-                                // Download songs for this playlist
-                                for (const driveSong of drivePlaylist.songs) {
-                                    if (cancelSync) throw new Error('Sync cancelled by user');
-                                    
-                                    if (driveSong.isUrl) {
-                                        newPlaylist.songs.push(driveSong);
-                                    } else {
-                                        const hasLocally = await DB.get('songs', driveSong.id);
-                                        
-                                        if (!hasLocally) {
-                                            const fileName = createFileName(driveSong.name, driveSong.id);
-                                            const songFile = driveFiles.files?.find(f => f.name === fileName);
-                                            
-                                            if (songFile) {
-                                                setSyncStatus(`Downloading: ${driveSong.name}...`);
-                                                const blob = await DriveAPI.downloadFile(accessToken, songFile.id);
-                                                await DB.save('songs', { id: driveSong.id, blob });
-                                                downloadCount++;
-                                            }
-                                        }
-                                        
-                                        newPlaylist.songs.push({
-                                            id: driveSong.id,
-                                            name: driveSong.name,
-                                            isUrl: false
-                                        });
-                                    }
-                                }
-                                
-                                mergedPlaylists.push(newPlaylist);
-                            }
-                        } else {
-                            // Only exists locally - keep it (new or Drive version was deleted)
-                            mergedPlaylists.push({
-                                ...localPlaylist,
-                                lastModified: Date.now()
-                            });
-                        }
-                        
-                        await DB.save('playlists', mergedPlaylists[mergedPlaylists.length - 1]);
-                    }
-                    
-                    // Then, add new playlists from Drive that don't exist locally
+                    // Add new playlists from Drive
                     for (const drivePlaylist of drivePlaylists) {
                         if (cancelSync) throw new Error('Sync cancelled by user');
                         
-                        if (!processedDriveIds.has(drivePlaylist.name)) {
+                        let localPlaylist = mergedPlaylists.find(p => p.name === drivePlaylist.name);
+                        
+                        if (!localPlaylist) {
                             // New playlist from Drive
-                            const newPlaylist = {
+                            localPlaylist = {
                                 id: Date.now() + Math.random(),
                                 name: drivePlaylist.name,
                                 songs: [],
                                 lastModified: Date.now()
                             };
-                            
-                            // Download songs
-                            for (const driveSong of drivePlaylist.songs) {
-                                if (driveSong.isUrl) {
-                                    newPlaylist.songs.push(driveSong);
-                                } else {
-                                    const hasLocally = await DB.get('songs', driveSong.id);
-                                    
-                                    if (!hasLocally) {
-                                        const fileName = createFileName(driveSong.name, driveSong.id);
-                                        const songFile = driveFiles.files?.find(f => f.name === fileName);
-                                        
-                                        if (songFile) {
-                                            setSyncStatus(`Downloading: ${driveSong.name}...`);
-                                            const blob = await DriveAPI.downloadFile(accessToken, songFile.id);
-                                            await DB.save('songs', { id: driveSong.id, blob });
-                                            downloadCount++;
-                                        }
-                                    }
-                                    
-                                    newPlaylist.songs.push({
-                                        id: driveSong.id,
-                                        name: driveSong.name,
-                                        isUrl: false
-                                    });
-                                }
-                            }
-                            
-                            mergedPlaylists.push(newPlaylist);
-                            await DB.save('playlists', newPlaylist);
+                            mergedPlaylists.push(localPlaylist);
                         }
+                        
+                        // Merge songs (filter out deleted ones)
+                        const localSongIds = new Set(localPlaylist.songs.map(s => s.id));
+                        const playlistDeletedSongs = deletedSongs[drivePlaylist.name] || [];
+                        
+                        for (const driveSong of drivePlaylist.songs) {
+                            // Skip if deleted
+                            if (playlistDeletedSongs.includes(driveSong.id)) continue;
+                            
+                            // Skip if already exists locally
+                            if (localSongIds.has(driveSong.id)) continue;
+                            
+                            if (driveSong.isUrl) {
+                                localPlaylist.songs.push(driveSong);
+                            } else {
+                                const hasLocally = await DB.get('songs', driveSong.id);
+                                
+                                if (!hasLocally) {
+                                    const fileName = createFileName(driveSong.name, driveSong.id);
+                                    const songFile = driveFiles.files?.find(f => f.name === fileName);
+                                    
+                                    if (songFile) {
+                                        setSyncStatus(`Downloading: ${driveSong.name}...`);
+                                        const blob = await DriveAPI.downloadFile(accessToken, songFile.id);
+                                        await DB.save('songs', { id: driveSong.id, blob });
+                                        downloadCount++;
+                                    }
+                                }
+                                
+                                localPlaylist.songs.push({
+                                    id: driveSong.id,
+                                    name: driveSong.name,
+                                    isUrl: false
+                                });
+                            }
+                        }
+                        
+                        await DB.save('playlists', localPlaylist);
                     }
                     
                     // STEP 3: Upload merged playlists to Drive
@@ -1351,7 +1299,7 @@
                     const playlistsMetadata = mergedPlaylists.map(p => ({
                         id: p.id,
                         name: p.name,
-                        lastModified: p.lastModified,
+                        lastModified: p.lastModified || Date.now(),
                         songs: p.songs.map(s => ({
                             id: s.id,
                             name: s.name,
@@ -1416,10 +1364,13 @@
                     
                     if (cancelSync) throw new Error('Sync cancelled by user');
                     
-                    // Update local state with merged playlists
+                    // Clear deletion tracking after successful sync
+                    await DB.save('settings', { key: 'deletedItems', value: { playlists: [], songs: {} } });
+                    
+                    // Update local state
                     setPlaylists(mergedPlaylists);
                     
-                    // Sync quota to Drive and get total
+                    // Sync quota
                     setSyncStatus('Syncing quota...');
                     const totalQuota = await syncQuotaToUpload(folderId, quotaCalls);
                     setQuotaCalls(totalQuota);
@@ -1501,6 +1452,13 @@
                         if (!s.isUrl) await DB.delete('songs', s.id);
                     }
                     await DB.delete('playlists', id);
+                    
+                    // Track deletion so sync knows not to restore it
+                    const deletedData = await DB.get('settings', 'deletedItems') || { value: { playlists: [], songs: {} } };
+                    if (!deletedData.value.playlists.includes(p.name)) {
+                        deletedData.value.playlists.push(p.name);
+                        await DB.save('settings', deletedData);
+                    }
                 }
                 
                 const newPlaylists = playlists.filter(x => x.id !== id);
@@ -1632,7 +1590,18 @@
                     if (s && !s.isUrl) await DB.delete('songs', s.id);
                     p.songs = p.songs.filter(x => x.id !== id);
                     
-                    // Save playlist immediately
+                    // Track deletion
+                    const deletedData = await DB.get('settings', 'deletedItems') || { value: { playlists: [], songs: {} } };
+                    if (!deletedData.value.songs[p.name]) {
+                        deletedData.value.songs[p.name] = [];
+                    }
+                    if (!deletedData.value.songs[p.name].includes(id)) {
+                        deletedData.value.songs[p.name].push(id);
+                        await DB.save('settings', deletedData);
+                    }
+                    
+                    // Save playlist immediately with timestamp
+                    updatePlaylistTimestamp(p);
                     await DB.save('playlists', p);
                     
                     setPlaylists([...playlists]);
