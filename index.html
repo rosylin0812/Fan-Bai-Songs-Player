@@ -1162,7 +1162,7 @@
                 if (audioRef.current) audioRef.current.volume = volume / 100;
             }, [volume]);
 
-            // Sync function
+            // Sync function - SYNCS PLAYLISTS + SONGS
             const handleSync = async () => {
                 if (!accessToken || !isSignedIn) {
                     alert('Please sign in first!');
@@ -1177,6 +1177,39 @@
                     setSyncStatus('Listing Drive files...');
                     const driveFiles = await DriveAPI.listFiles(accessToken, folderId);
                     
+                    // STEP 1: Upload playlists metadata
+                    setSyncStatus('Syncing playlists...');
+                    const playlistsMetadata = playlists.map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        songs: p.songs.map(s => ({
+                            id: s.id,
+                            name: s.name,
+                            isUrl: s.isUrl,
+                            url: s.url
+                        }))
+                    }));
+                    
+                    const metadataBlob = new Blob([JSON.stringify(playlistsMetadata, null, 2)], { type: 'application/json' });
+                    
+                    // Check if playlists.json exists
+                    const existingMeta = driveFiles.files?.find(f => f.name === 'playlists.json');
+                    if (existingMeta) {
+                        // Delete old metadata first
+                        await fetch(
+                            `https://www.googleapis.com/drive/v3/files/${existingMeta.id}`,
+                            {
+                                method: 'DELETE',
+                                headers: { 'Authorization': `Bearer ${accessToken}` }
+                            }
+                        );
+                        setQuotaCalls(prev => prev + 1);
+                    }
+                    
+                    // Upload new metadata
+                    await DriveAPI.uploadFile(accessToken, folderId, 'playlists.json', metadataBlob);
+                    
+                    // STEP 2: Upload songs
                     const localSongs = [];
                     for (const playlist of playlists) {
                         for (const song of playlist.songs) {
@@ -1195,64 +1228,97 @@
                         }
                     }
                     
-                    setSyncStatus(`Uploading ${localSongs.length} local songs...`);
+                    setSyncStatus(`Uploading songs...`);
                     let uploadCount = 0;
                     
                     for (const song of localSongs) {
                         const exists = driveFiles.files?.find(f => 
-                            f.name === `${song.name}.mp3` && 
+                            f.name === `${song.id}.mp3` && 
                             Math.abs(f.size - song.size) < 1024
                         );
                         
                         if (!exists) {
                             setSyncStatus(`Uploading: ${song.name}...`);
-                            await DriveAPI.uploadFile(accessToken, folderId, `${song.name}.mp3`, song.blob);
+                            await DriveAPI.uploadFile(accessToken, folderId, `${song.id}.mp3`, song.blob);
                             uploadCount++;
                         }
                     }
                     
-                    setSyncStatus('Checking for new Drive songs...');
+                    // STEP 3: Download playlists metadata from Drive
+                    setSyncStatus('Downloading playlists from Drive...');
+                    const playlistsFile = driveFiles.files?.find(f => f.name === 'playlists.json');
+                    
                     let downloadCount = 0;
                     
-                    if (driveFiles.files) {
-                        for (const driveFile of driveFiles.files) {
-                            const exists = localSongs.find(s => 
-                                `${s.name}.mp3` === driveFile.name &&
-                                Math.abs(s.size - driveFile.size) < 1024
-                            );
+                    if (playlistsFile) {
+                        const metaBlob = await DriveAPI.downloadFile(accessToken, playlistsFile.id);
+                        const metaText = await metaBlob.text();
+                        const drivePlaylists = JSON.parse(metaText);
+                        
+                        // Merge Drive playlists with local
+                        const mergedPlaylists = [...playlists];
+                        
+                        for (const drivePlaylist of drivePlaylists) {
+                            // Check if playlist exists locally by name
+                            let localPlaylist = mergedPlaylists.find(p => p.name === drivePlaylist.name);
                             
-                            if (!exists) {
-                                setSyncStatus(`Downloading: ${driveFile.name}...`);
-                                const blob = await DriveAPI.downloadFile(accessToken, driveFile.id);
-                                const songId = Date.now() + Math.random();
-                                await DB.save('songs', { id: songId, blob });
-                                
-                                let targetPlaylist = playlists.find(p => p.name === 'Synced from Drive') || playlists[0];
-                                if (!targetPlaylist) {
-                                    const id = Date.now();
-                                    targetPlaylist = { id, name: 'Synced from Drive', songs: [] };
-                                    playlists.push(targetPlaylist);
-                                }
-                                
-                                targetPlaylist.songs.push({
-                                    id: songId,
-                                    name: driveFile.name.replace(/\.[^/.]+$/, ''),
-                                    isUrl: false
-                                });
-                                
-                                await DB.save('playlists', targetPlaylist);
-                                downloadCount++;
+                            if (!localPlaylist) {
+                                // Create new playlist
+                                localPlaylist = {
+                                    id: Date.now() + Math.random(),
+                                    name: drivePlaylist.name,
+                                    songs: []
+                                };
+                                mergedPlaylists.push(localPlaylist);
                             }
+                            
+                            // Download songs for this playlist
+                            for (const driveSong of drivePlaylist.songs) {
+                                if (driveSong.isUrl) {
+                                    // URL songs - just add if not exists
+                                    if (!localPlaylist.songs.find(s => s.id === driveSong.id)) {
+                                        localPlaylist.songs.push(driveSong);
+                                    }
+                                } else {
+                                    // Local songs - check if we have it
+                                    const hasLocally = await DB.get('songs', driveSong.id);
+                                    
+                                    if (!hasLocally) {
+                                        // Download from Drive
+                                        const songFile = driveFiles.files?.find(f => f.name === `${driveSong.id}.mp3`);
+                                        
+                                        if (songFile) {
+                                            setSyncStatus(`Downloading: ${driveSong.name}...`);
+                                            const blob = await DriveAPI.downloadFile(accessToken, songFile.id);
+                                            await DB.save('songs', { id: driveSong.id, blob });
+                                            downloadCount++;
+                                        }
+                                    }
+                                    
+                                    // Add song to playlist if not already there
+                                    if (!localPlaylist.songs.find(s => s.id === driveSong.id)) {
+                                        localPlaylist.songs.push({
+                                            id: driveSong.id,
+                                            name: driveSong.name,
+                                            isUrl: false
+                                        });
+                                    }
+                                }
+                            }
+                            
+                            // Save playlist
+                            await DB.save('playlists', localPlaylist);
                         }
+                        
+                        setPlaylists(mergedPlaylists);
                     }
                     
-                    setPlaylists([...playlists]);
                     setSyncStatus('Sync complete!');
-                    alert(`✅ Sync Complete!\n\nUploaded: ${uploadCount} songs\nDownloaded: ${downloadCount} songs\n\nAPI calls used: ${quotaCalls}`);
+                    alert(`✅ Sync Complete!\n\nUploaded: ${uploadCount} songs\nDownloaded: ${downloadCount} songs\n\nYour playlists are synced!\n\nAPI calls: ${quotaCalls}/20,000`);
                     
                 } catch (error) {
                     console.error('Sync error:', error);
-                    alert(`❌ Sync failed: ${error.message}`);
+                    alert(`❌ Sync failed: ${error.message}\n\nPlease try again.`);
                 } finally {
                     setSyncing(false);
                     setSyncStatus('');
@@ -2001,7 +2067,7 @@
                             // Signed-in state
                             React.createElement('div', { className: `${card}`, style: { padding: '16px' } },
                                 // User info + theme toggle
-                                React.createElement('div', { className: 'flex items-center justify-between mb-3' },
+                                React.createElement('div', { className: 'flex items-center justify-between mb-5' },
                                     React.createElement('div', {},
                                         React.createElement('div', { style: { fontSize: '14px', fontWeight: '600' } }, userInfo?.name || 'User'),
                                         React.createElement('div', { style: { fontSize: '12px', opacity: 0.7 } }, userInfo?.email || '')
@@ -2013,13 +2079,20 @@
                                     }, darkMode ? React.createElement(Icons.Sun) : React.createElement(Icons.Moon))
                                 ),
                                 
-                                // Sync button
+                                // Sync button (BLUE, no icon)
                                 React.createElement('button', { 
                                     onClick: handleSync,
                                     disabled: syncing,
                                     className: 'btn-primary',
-                                    style: { width: '100%', fontSize: '13px', padding: '12px 20px', marginBottom: '8px' }
-                                }, syncing ? `⏳ ${syncStatus}` : '🔄 Sync Now'),
+                                    style: { 
+                                        width: '100%', 
+                                        fontSize: '13px', 
+                                        padding: '12px 20px', 
+                                        marginBottom: '8px',
+                                        background: 'linear-gradient(135deg, #1e90ff 0%, #4169e1 100%)',
+                                        boxShadow: '0 4px 15px rgba(30, 144, 255, 0.4)'
+                                    }
+                                }, syncing ? `⏳ ${syncStatus}` : 'Sync Now'),
                                 
                                 // Quota display
                                 React.createElement('div', { style: { fontSize: '12px', textAlign: 'center', opacity: 0.7, marginBottom: '8px' } },
@@ -2078,6 +2151,7 @@
                                                 setIsSignedIn(true);
                                                 setUserInfo(user);
                                                 setAccessToken(token);
+                                                setQuotaCalls(0); // Reset quota count on fresh sign-in
                                                 
                                                 // Save to IndexedDB
                                                 await DB.save('settings', { 
