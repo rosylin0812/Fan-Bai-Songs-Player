@@ -1420,6 +1420,51 @@
                     }
                     await DriveAPI.uploadFile(accessToken, folderId, 'deleted.json', deletedBlob);
                     
+                    // STEP 2.5: Delete orphaned audio files from Drive
+                    setSyncStatus('Cleaning up old files...');
+                    
+                    // Get list of all song IDs that should exist
+                    const validSongIds = new Set();
+                    for (const playlist of mergedPlaylists) {
+                        for (const song of playlist.songs) {
+                            if (!song.isUrl) {
+                                validSongIds.add(song.id);
+                            }
+                        }
+                    }
+                    
+                    // Delete audio files that are no longer in any playlist
+                    let deletedFilesCount = 0;
+                    for (const file of driveFiles.files || []) {
+                        // Skip metadata files
+                        if (file.name === 'playlists.json' || file.name === 'deleted.json' || file.name === 'quota.json') {
+                            continue;
+                        }
+                        
+                        // Extract song ID from filename (e.g., "Song Name-a3f2.mp3" -> "a3f2")
+                        const songId = extractIdFromFileName(file.name);
+                        
+                        if (songId && !validSongIds.has(songId)) {
+                            // This file is orphaned - delete it
+                            console.log(`🗑️ Deleting orphaned file: ${file.name}`);
+                            try {
+                                await fetch(
+                                    `https://www.googleapis.com/drive/v3/files/${file.id}`,
+                                    {
+                                        method: 'DELETE',
+                                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                                    }
+                                );
+                                setQuotaCalls(prev => prev + 1);
+                                deletedFilesCount++;
+                            } catch (e) {
+                                console.error('Error deleting file:', file.name, e);
+                            }
+                        }
+                    }
+                    
+                    console.log(`🔍 [SYNC DEBUG] Deleted ${deletedFilesCount} orphaned files from Drive`);
+                    
                     // STEP 3: Upload local songs
                     const localSongs = [];
                     for (const playlist of mergedPlaylists) {
@@ -1462,6 +1507,18 @@
                     
                     // Update local state with merged playlists
                     setPlaylists(mergedPlaylists);
+                    
+                    // Fix activePlaylist if it no longer exists
+                    if (activePlaylist && !mergedPlaylists.find(p => p.id === activePlaylist)) {
+                        console.log('🔍 [SYNC DEBUG] Active playlist no longer exists, resetting to first');
+                        if (mergedPlaylists.length > 0) {
+                            setActivePlaylist(mergedPlaylists[0].id);
+                            setView('home'); // Go to home to show all playlists
+                        } else {
+                            setActivePlaylist(null);
+                            setView('home');
+                        }
+                    }
                     
                     // Sync quota to Drive and get total
                     setSyncStatus('Syncing quota...');
