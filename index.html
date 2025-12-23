@@ -2569,7 +2569,26 @@
                                         React.createElement('div', { 
                                             className: 'text-sm text-muted'
                                         }, `${p.songs.length} tracks`)
-                                    ))
+                                    )),
+                                    
+                                    // Empty state when no playlists
+                                    filtered.length === 0 && React.createElement('div', {
+                                        style: {
+                                            textAlign: 'center',
+                                            padding: '60px 20px',
+                                            color: darkMode ? '#b3b3b3' : '#6b7280'
+                                        }
+                                    },
+                                        React.createElement('div', { 
+                                            style: { fontSize: '48px', marginBottom: '16px' }
+                                        }, '🎵'),
+                                        React.createElement('div', { 
+                                            style: { fontSize: '18px', fontWeight: '600', marginBottom: '8px' }
+                                        }, 'No playlists yet'),
+                                        React.createElement('div', { 
+                                            style: { fontSize: '14px' }
+                                        }, searchQuery ? 'No results found' : 'Click "Create New Playlist" to get started')
+                                    )
                                 )
                             ),
                             
