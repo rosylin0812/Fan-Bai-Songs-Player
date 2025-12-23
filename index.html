@@ -1253,7 +1253,33 @@
                     const deletedPlaylists = deletedData.value?.playlists || [];
                     const deletedSongs = deletedData.value?.songs || {};
                     
-                    let mergedPlaylists = [...playlists]; // Start with local
+                    // CRITICAL: Filter local playlists FIRST to remove deleted ones
+                    let mergedPlaylists = playlists.filter(p => !deletedPlaylists.includes(p.name));
+                    
+                    // Also filter deleted songs from remaining local playlists
+                    mergedPlaylists.forEach(playlist => {
+                        const playlistDeletedSongs = deletedSongs[playlist.name] || [];
+                        playlist.songs = playlist.songs.filter(s => !playlistDeletedSongs.includes(s.id));
+                    });
+                    
+                    // Save filtered playlists to DB immediately
+                    for (const playlist of mergedPlaylists) {
+                        await DB.save('playlists', playlist);
+                    }
+                    
+                    // Delete playlists that were filtered out from DB
+                    for (const playlist of playlists) {
+                        if (deletedPlaylists.includes(playlist.name)) {
+                            await DB.delete('playlists', playlist.id);
+                            // Also delete songs
+                            for (const song of playlist.songs) {
+                                if (!song.isUrl) {
+                                    await DB.delete('songs', song.id);
+                                }
+                            }
+                        }
+                    }
+                    
                     let downloadCount = 0;
                     
                     if (playlistsFile) {
@@ -1269,7 +1295,7 @@
                             drivePlaylists = [];
                         }
                         
-                        // Filter out deleted playlists
+                        // Filter out deleted playlists from Drive
                         drivePlaylists = drivePlaylists.filter(p => !deletedPlaylists.includes(p.name));
                         
                         // Merge Drive playlists with local
