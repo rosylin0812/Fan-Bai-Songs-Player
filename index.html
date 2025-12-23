@@ -1388,6 +1388,9 @@
                         }))
                     }));
                     
+                    console.log('🔍 [SYNC DEBUG] About to upload playlists.json:', playlistsMetadata.map(p => p.name));
+                    console.log('🔍 [SYNC DEBUG] Full metadata:', JSON.stringify(playlistsMetadata, null, 2));
+                    
                     const metadataBlob = new Blob([JSON.stringify(playlistsMetadata, null, 2)], { type: 'application/json' });
                     
                     const existingMeta = driveFiles.files?.find(f => f.name === 'playlists.json');
@@ -1433,6 +1436,9 @@
                         }
                     }
                     
+                    console.log('🔍 [SYNC DEBUG] Valid song IDs:', Array.from(validSongIds));
+                    console.log('🔍 [SYNC DEBUG] mergedPlaylists before cleanup:', mergedPlaylists.map(p => p.name));
+                    
                     // Delete audio files that are no longer in any playlist
                     let deletedFilesCount = 0;
                     for (const file of driveFiles.files || []) {
@@ -1442,7 +1448,8 @@
                         }
                         
                         // Extract song ID from filename (e.g., "Song Name-a3f2.mp3" -> "a3f2")
-                        const songId = extractIdFromFileName(file.name);
+                        const match = file.name.match(/-([a-z0-9]{4})\.(mp3|m4a|wav|ogg)$/i);
+                        const songId = match ? match[1] : null;
                         
                         if (songId && !validSongIds.has(songId)) {
                             // This file is orphaned - delete it
@@ -1459,11 +1466,13 @@
                                 deletedFilesCount++;
                             } catch (e) {
                                 console.error('Error deleting file:', file.name, e);
+                                // Continue even if deletion fails
                             }
                         }
                     }
                     
                     console.log(`🔍 [SYNC DEBUG] Deleted ${deletedFilesCount} orphaned files from Drive`);
+                    console.log('🔍 [SYNC DEBUG] mergedPlaylists after cleanup (should be unchanged):', mergedPlaylists.map(p => p.name));
                     
                     // STEP 3: Upload local songs
                     const localSongs = [];
