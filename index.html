@@ -1266,7 +1266,17 @@
                     console.log('🔍 [SYNC DEBUG] Deleted playlists list:', deletedPlaylists);
                     console.log('🔍 [SYNC DEBUG] Deleted songs:', deletedSongs);
                     
-                    let mergedPlaylists = playlists.filter(p => !deletedPlaylists.includes(p.name));
+                    // SAFETY CHECK: If deletions would remove ALL playlists, something is wrong - clear the deletion list
+                    let mergedPlaylists;
+                    if (playlists.length > 0 && deletedPlaylists.length >= playlists.length) {
+                        console.warn('⚠️ WARNING: Deletion list would remove ALL playlists! Clearing deletion list to prevent data loss.');
+                        mergedPlaylists = [...playlists];
+                        // Clear the bad deletion data
+                        deletedData.value = { playlists: [], songs: {} };
+                        await DB.save('settings', deletedData);
+                    } else {
+                        mergedPlaylists = playlists.filter(p => !deletedPlaylists.includes(p.name));
+                    }
                     
                     console.log('🔍 [SYNC DEBUG] Playlists AFTER filter:', mergedPlaylists.map(p => p.name));
                     
