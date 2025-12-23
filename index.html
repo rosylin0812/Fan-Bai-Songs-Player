@@ -1309,6 +1309,57 @@
                         }
                     }
                     
+                    // CRITICAL: Delete orphaned files from Drive BEFORE merging!
+                    setSyncStatus('Cleaning up deleted files...');
+                    
+                    // Get list of songs that should exist (from filtered local playlists)
+                    const validSongIds = new Set();
+                    for (const playlist of mergedPlaylists) {
+                        for (const song of playlist.songs) {
+                            if (!song.isUrl) {
+                                validSongIds.add(song.id);
+                            }
+                        }
+                    }
+                    
+                    console.log('🔍 [SYNC DEBUG] Valid song IDs (should keep):', Array.from(validSongIds));
+                    
+                    // Delete orphaned audio files from Drive
+                    let deletedFilesCount = 0;
+                    const deletedSongIds = new Set(); // Track what we delete
+                    
+                    for (const file of driveFiles.files || []) {
+                        // Skip metadata files
+                        if (file.name === 'playlists.json' || file.name === 'deleted.json' || file.name === 'quota.json') {
+                            continue;
+                        }
+                        
+                        // Extract song ID from filename
+                        const match = file.name.match(/-([a-z0-9]{4})\.(mp3|m4a|wav|ogg)$/i);
+                        const songId = match ? match[1] : null;
+                        
+                        if (songId && !validSongIds.has(songId)) {
+                            console.log(`🗑️ Deleting orphaned file from Drive BEFORE merge: ${file.name}`);
+                            try {
+                                await fetch(
+                                    `https://www.googleapis.com/drive/v3/files/${file.id}`,
+                                    {
+                                        method: 'DELETE',
+                                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                                    }
+                                );
+                                setQuotaCalls(prev => prev + 1);
+                                deletedFilesCount++;
+                                deletedSongIds.add(songId); // Remember we deleted this
+                            } catch (e) {
+                                console.error('Error deleting file:', file.name, e);
+                            }
+                        }
+                    }
+                    
+                    console.log(`🔍 [SYNC DEBUG] Deleted ${deletedFilesCount} orphaned files BEFORE merge`);
+                    console.log(`🔍 [SYNC DEBUG] Deleted song IDs (will NOT re-download):`, Array.from(deletedSongIds));
+                    
                     let downloadCount = 0;
                     
                     if (playlistsFile) {
@@ -1347,8 +1398,17 @@
                             const playlistDeletedSongs = deletedSongs[drivePlaylist.name] || [];
                             
                             for (const driveSong of drivePlaylist.songs) {
-                                // Skip deleted songs
-                                if (playlistDeletedSongs.includes(driveSong.id)) continue;
+                                // Skip deleted songs (from deletion tracking)
+                                if (playlistDeletedSongs.includes(driveSong.id)) {
+                                    console.log(`⏭️ Skipping deleted song from tracking: ${driveSong.name}`);
+                                    continue;
+                                }
+                                
+                                // Skip songs we just deleted from Drive
+                                if (deletedSongIds.has(driveSong.id)) {
+                                    console.log(`⏭️ Skipping song we just deleted from Drive: ${driveSong.name}`);
+                                    continue;
+                                }
                                 
                                 if (driveSong.isUrl) {
                                     if (!localPlaylist.songs.find(s => s.id === driveSong.id)) {
@@ -1433,56 +1493,6 @@
                     }
                     await DriveAPI.uploadFile(accessToken, folderId, 'deleted.json', deletedBlob);
                     
-                    // STEP 2.5: Delete orphaned audio files from Drive
-                    setSyncStatus('Cleaning up old files...');
-                    
-                    // Get list of all song IDs that should exist
-                    const validSongIds = new Set();
-                    for (const playlist of mergedPlaylists) {
-                        for (const song of playlist.songs) {
-                            if (!song.isUrl) {
-                                validSongIds.add(song.id);
-                            }
-                        }
-                    }
-                    
-                    console.log('🔍 [SYNC DEBUG] Valid song IDs:', Array.from(validSongIds));
-                    console.log('🔍 [SYNC DEBUG] mergedPlaylists before cleanup:', mergedPlaylists.map(p => p.name));
-                    
-                    // Delete audio files that are no longer in any playlist
-                    let deletedFilesCount = 0;
-                    for (const file of driveFiles.files || []) {
-                        // Skip metadata files
-                        if (file.name === 'playlists.json' || file.name === 'deleted.json' || file.name === 'quota.json') {
-                            continue;
-                        }
-                        
-                        // Extract song ID from filename (e.g., "Song Name-a3f2.mp3" -> "a3f2")
-                        const match = file.name.match(/-([a-z0-9]{4})\.(mp3|m4a|wav|ogg)$/i);
-                        const songId = match ? match[1] : null;
-                        
-                        if (songId && !validSongIds.has(songId)) {
-                            // This file is orphaned - delete it
-                            console.log(`🗑️ Deleting orphaned file: ${file.name}`);
-                            try {
-                                await fetch(
-                                    `https://www.googleapis.com/drive/v3/files/${file.id}`,
-                                    {
-                                        method: 'DELETE',
-                                        headers: { 'Authorization': `Bearer ${accessToken}` }
-                                    }
-                                );
-                                setQuotaCalls(prev => prev + 1);
-                                deletedFilesCount++;
-                            } catch (e) {
-                                console.error('Error deleting file:', file.name, e);
-                                // Continue even if deletion fails
-                            }
-                        }
-                    }
-                    
-                    console.log(`🔍 [SYNC DEBUG] Deleted ${deletedFilesCount} orphaned files from Drive`);
-                    console.log('🔍 [SYNC DEBUG] mergedPlaylists after cleanup (should be unchanged):', mergedPlaylists.map(p => p.name));
                     
                     // STEP 3: Upload local songs
                     const localSongs = [];
