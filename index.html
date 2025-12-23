@@ -1212,17 +1212,25 @@
                     
                     // Download deleted.json from Drive and merge
                     const deletedFile = driveFiles.files?.find(f => f.name === 'deleted.json');
+                    console.log('🔍 [SYNC DEBUG] deleted.json exists in Drive?', !!deletedFile);
+                    
                     if (deletedFile) {
                         try {
                             const deletedBlob = await DriveAPI.downloadFile(accessToken, deletedFile.id);
                             const deletedText = await deletedBlob.text();
                             const driveDeleted = JSON.parse(deletedText);
                             
+                            console.log('🔍 [SYNC DEBUG] Downloaded deleted.json:', driveDeleted);
+                            
                             // Merge deletion lists (union of both)
                             const mergedDeletedPlaylists = [...new Set([
                                 ...(deletedData.value?.playlists || []),
                                 ...(driveDeleted.playlists || [])
                             ])];
+                            
+                            console.log('🔍 [SYNC DEBUG] Local deletions:', deletedData.value?.playlists);
+                            console.log('🔍 [SYNC DEBUG] Drive deletions:', driveDeleted.playlists);
+                            console.log('🔍 [SYNC DEBUG] Merged deletions:', mergedDeletedPlaylists);
                             
                             const mergedDeletedSongs = { ...(deletedData.value?.songs || {}), ...(driveDeleted.songs || {}) };
                             // Merge song arrays per playlist
@@ -1254,12 +1262,23 @@
                     const deletedSongs = deletedData.value?.songs || {};
                     
                     // CRITICAL: Filter local playlists FIRST to remove deleted ones
+                    console.log('🔍 [SYNC DEBUG] Local playlists BEFORE filter:', playlists.map(p => p.name));
+                    console.log('🔍 [SYNC DEBUG] Deleted playlists list:', deletedPlaylists);
+                    console.log('🔍 [SYNC DEBUG] Deleted songs:', deletedSongs);
+                    
                     let mergedPlaylists = playlists.filter(p => !deletedPlaylists.includes(p.name));
+                    
+                    console.log('🔍 [SYNC DEBUG] Playlists AFTER filter:', mergedPlaylists.map(p => p.name));
                     
                     // Also filter deleted songs from remaining local playlists
                     mergedPlaylists.forEach(playlist => {
                         const playlistDeletedSongs = deletedSongs[playlist.name] || [];
+                        const beforeCount = playlist.songs.length;
                         playlist.songs = playlist.songs.filter(s => !playlistDeletedSongs.includes(s.id));
+                        const afterCount = playlist.songs.length;
+                        if (beforeCount !== afterCount) {
+                            console.log(`🔍 [SYNC DEBUG] Filtered ${beforeCount - afterCount} songs from "${playlist.name}"`);
+                        }
                     });
                     
                     // Save filtered playlists to DB immediately
@@ -1450,6 +1469,11 @@
                     setQuotaCalls(totalQuota);
                     
                     setSyncStatus('Sync complete!');
+                    
+                    console.log('🔍 [SYNC DEBUG] Final merged playlists:', mergedPlaylists.map(p => p.name));
+                    console.log('🔍 [SYNC DEBUG] Uploaded to Drive:', playlistsMetadata.map(p => p.name));
+                    console.log('🔍 [SYNC DEBUG] Upload count:', uploadCount, 'Download count:', downloadCount);
+                    
                     alert(`✅ Sync Complete!\n\nUploaded: ${uploadCount} songs\nDownloaded: ${downloadCount} songs\n\nYour playlists are synced!\n\nTotal API calls today: ${totalQuota}/20,000`);
                     
                 } catch (error) {
