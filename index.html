@@ -1742,7 +1742,7 @@
             const handleCreate = async () => {
                 if (modalInput.trim()) {
                     debugLog('Creating playlist:', modalInput);
-                    const id = Date.now();
+                    const id = Math.floor(Date.now()); // Force integer
                     const newPlaylist = { id, name: modalInput.trim(), songs: [], createdAt: id };
                     
                     await DB.save('playlists', newPlaylist);
