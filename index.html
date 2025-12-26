@@ -1874,23 +1874,51 @@
                     debugLog('Processing file:', file.name);
                     const shortId = generateShortId(); // Generate 4-char ID
                     const songName = file.name.replace(/\.[^/.]+$/, '');
+                    
+                    let driveFileId = null;
+                    
+                    // Upload to Google Drive if signed in
+                    if (isSignedIn && accessToken) {
+                        try {
+                            setSyncStatus(`Uploading ${songName} to Drive...`);
+                            
+                            // Get or create folder
+                            const folderId = await DriveAPI.getOrCreateFolder(accessToken);
+                            
+                            // Upload file to Drive with short ID in filename
+                            const fileName = `${songName}-${shortId}${file.name.match(/\.[^/.]+$/)?.[0] || '.mp3'}`;
+                            driveFileId = await DriveAPI.uploadFile(accessToken, folderId, fileName, file);
+                            
+                            debugLog('Uploaded to Drive:', driveFileId);
+                            setSyncStatus('');
+                        } catch (error) {
+                            console.error('Drive upload failed:', error);
+                            setSyncStatus('');
+                            alert(`Failed to upload ${songName} to Drive. Saving locally only.`);
+                        }
+                    }
+                    
                     const song = { 
                         id: shortId, 
                         name: songName, 
-                        isUrl: false 
+                        isUrl: false,
+                        driveFileId: driveFileId // Store Drive file ID if uploaded
                     };
+                    
+                    // Always save to IndexedDB for offline playback
                     await DB.save('songs', { id: shortId, blob: file });
                     playlist.songs.push(song);
                     
-                    // Also save to Firebase if connected
+                    // Save to Firebase if connected
                     if (firebaseUserId) {
                         await FirebaseDB.saveSong(firebaseUserId, `pl_${activePlaylist}`, shortId, {
                             name: songName,
-                            driveFileId: shortId,
+                            driveFileId: driveFileId, // Link to Drive file
                             isUrl: false,
                             position: playlist.songs.length - 1,
                             createdAt: Date.now()
                         });
+                        debugLog('Saved to Firebase with driveFileId:', driveFileId);
                     }
                 }
                 
@@ -1959,14 +1987,42 @@
             const playSong = async (song, pid) => {
                 if (song.isUrl) {
                     setCurrentSong({ ...song, playlistId: pid });
+                    setIsPlaying(true);
                 } else {
+                    // Try to get from local cache first
                     const data = await DB.get('songs', song.id);
                     if (data?.blob) {
+                        // Found in cache - play it!
                         const url = URL.createObjectURL(data.blob);
                         setCurrentSong({ ...song, playlistId: pid, url });
+                        setIsPlaying(true);
+                    } else {
+                        // Not in cache - try to download from Google Drive
+                        if (song.driveFileId && isSignedIn && accessToken) {
+                            try {
+                                setSyncStatus(`Downloading ${song.name} from Drive...`);
+                                
+                                const blob = await DriveAPI.downloadFile(accessToken, song.driveFileId);
+                                
+                                // Save to cache for next time
+                                await DB.save('songs', { id: song.id, blob: blob });
+                                
+                                const url = URL.createObjectURL(blob);
+                                setCurrentSong({ ...song, playlistId: pid, url });
+                                setIsPlaying(true);
+                                setSyncStatus('');
+                                
+                                debugLog('Downloaded and cached from Drive:', song.name);
+                            } catch (error) {
+                                console.error('Failed to download from Drive:', error);
+                                setSyncStatus('');
+                                alert(`Failed to download ${song.name} from Drive.\n\nMake sure you're signed in to Google Drive.`);
+                            }
+                        } else {
+                            alert(`${song.name} is not available locally.\n\nSign in to Google Drive to download it.`);
+                        }
                     }
                 }
-                setIsPlaying(true);
             };
 
             const playNext = () => {
@@ -1994,10 +2050,32 @@
                 const p = playlists.find(x => x.id === pid);
                 if (p) {
                     const s = p.songs.find(x => x.id === id);
-                    if (s && !s.isUrl) await DB.delete('songs', s.id);
+                    
+                    // Delete from local cache
+                    if (s && !s.isUrl) {
+                        await DB.delete('songs', s.id);
+                    }
+                    
+                    // Delete from Google Drive if it has a driveFileId
+                    if (s && s.driveFileId && isSignedIn && accessToken) {
+                        try {
+                            await fetch(
+                                `https://www.googleapis.com/drive/v3/files/${s.driveFileId}`,
+                                {
+                                    method: 'DELETE',
+                                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                                }
+                            );
+                            debugLog('Deleted from Drive:', s.driveFileId);
+                        } catch (error) {
+                            console.error('Failed to delete from Drive:', error);
+                            // Continue anyway - file deleted locally and from Firebase
+                        }
+                    }
+                    
                     p.songs = p.songs.filter(x => x.id !== id);
                     
-                    // Also delete from Firebase if connected
+                    // Delete from Firebase if connected
                     if (firebaseUserId) {
                         await FirebaseDB.deleteSong(firebaseUserId, `pl_${pid}`, id);
                     }
