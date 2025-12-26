@@ -707,11 +707,161 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     
     <!-- React -->
+    <!-- Firebase SDK (Real-time Database + Auth) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    
+    <!-- React -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
     <script>
         const { useState, useEffect, useRef } = React;
+        const PRIMARY = '#1DB954';
+
+        // ============================================
+        // FIREBASE CONFIGURATION
+        // ============================================
+        // TODO: Replace with your Firebase config from Firebase Console
+        // Get this from: Firebase Console > Project Settings > Your apps > Web app
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY_HERE",
+            authDomain: "your-app.firebaseapp.com",
+            databaseURL: "https://your-app-default-rtdb.firebaseio.com",
+            projectId: "your-project-id",
+            storageBucket: "your-app.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abc123def456"
+        };
+
+        // Initialize Firebase
+        let firebaseApp, firebaseDB, firebaseAuth;
+        let isFirebaseConfigured = false;
+
+        try {
+            if (firebaseConfig.apiKey !== "YOUR_API_KEY_HERE") {
+                firebaseApp = firebase.initializeApp(firebaseConfig);
+                firebaseDB = firebase.database();
+                firebaseAuth = firebase.auth();
+                isFirebaseConfigured = true;
+                console.log('✅ Firebase initialized successfully');
+            } else {
+                console.warn('⚠️ Firebase not configured. Add your config to enable real-time sync.');
+            }
+        } catch (error) {
+            console.error('❌ Firebase initialization error:', error);
+            isFirebaseConfigured = false;
+        }
+
+        // ============================================
+        // FIREBASE DATABASE HELPERS
+        // ============================================
+        const FirebaseDB = {
+            // Save playlist metadata to Firebase
+            async savePlaylist(userId, playlistId, playlistData) {
+                if (!isFirebaseConfigured) return;
+                try {
+                    await firebaseDB.ref(`users/${userId}/playlists/${playlistId}`).set({
+                        name: playlistData.name,
+                        createdAt: playlistData.createdAt || Date.now(),
+                        updatedAt: Date.now()
+                    });
+                    console.log('✅ Firebase: Playlist saved:', playlistData.name);
+                } catch (error) {
+                    console.error('❌ Firebase: Error saving playlist:', error);
+                }
+            },
+
+            // Save song metadata to Firebase
+            async saveSong(userId, playlistId, songId, songData) {
+                if (!isFirebaseConfigured) return;
+                try {
+                    await firebaseDB.ref(`users/${userId}/playlists/${playlistId}/songs/${songId}`).set({
+                        name: songData.name,
+                        driveFileId: songData.driveFileId || songId,
+                        isUrl: songData.isUrl || false,
+                        url: songData.url || null,
+                        position: songData.position || 0,
+                        createdAt: songData.createdAt || Date.now()
+                    });
+                    console.log('✅ Firebase: Song saved:', songData.name);
+                } catch (error) {
+                    console.error('❌ Firebase: Error saving song:', error);
+                }
+            },
+
+            // Delete playlist from Firebase
+            async deletePlaylist(userId, playlistId) {
+                if (!isFirebaseConfigured) return;
+                try {
+                    await firebaseDB.ref(`users/${userId}/playlists/${playlistId}`).remove();
+                    console.log('✅ Firebase: Playlist deleted');
+                } catch (error) {
+                    console.error('❌ Firebase: Error deleting playlist:', error);
+                }
+            },
+
+            // Delete song from Firebase
+            async deleteSong(userId, playlistId, songId) {
+                if (!isFirebaseConfigured) return;
+                try {
+                    await firebaseDB.ref(`users/${userId}/playlists/${playlistId}/songs/${songId}`).remove();
+                    console.log('✅ Firebase: Song deleted');
+                } catch (error) {
+                    console.error('❌ Firebase: Error deleting song:', error);
+                }
+            },
+
+            // Update song position (for drag & drop reordering)
+            async updateSongPosition(userId, playlistId, songId, newPosition) {
+                if (!isFirebaseConfigured) return;
+                try {
+                    await firebaseDB.ref(`users/${userId}/playlists/${playlistId}/songs/${songId}/position`).set(newPosition);
+                    console.log('✅ Firebase: Song position updated');
+                } catch (error) {
+                    console.error('❌ Firebase: Error updating position:', error);
+                }
+            },
+
+            // Listen to all playlists in real-time
+            listenToPlaylists(userId, callback) {
+                if (!isFirebaseConfigured) return () => {};
+                
+                const ref = firebaseDB.ref(`users/${userId}/playlists`);
+                
+                ref.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        // Convert Firebase object to array
+                        const playlistsArray = Object.keys(data).map(playlistId => {
+                            const playlist = data[playlistId];
+                            const songs = playlist.songs ? 
+                                Object.keys(playlist.songs).map(songId => ({
+                                    id: songId,
+                                    ...playlist.songs[songId]
+                                })).sort((a, b) => a.position - b.position)
+                                : [];
+                            
+                            return {
+                                id: playlistId.replace('pl_', ''), // Remove pl_ prefix
+                                name: playlist.name,
+                                createdAt: playlist.createdAt,
+                                updatedAt: playlist.updatedAt,
+                                songs: songs
+                            };
+                        });
+                        callback(playlistsArray);
+                    } else {
+                        callback([]);
+                    }
+                });
+
+                // Return unsubscribe function
+                return () => ref.off();
+            }
+        };
+
         const PRIMARY = '#1DB954';
 
         // ============================================
@@ -1174,6 +1324,45 @@
                 const handleClick = () => setContextMenu(null);
                 document.addEventListener('click', handleClick);
                 return () => document.removeEventListener('click', handleClick);
+            }, []);
+
+            // Firebase Authentication State Listener
+            useEffect(() => {
+                if (!isFirebaseConfigured || !firebaseAuth) return;
+                
+                console.log('🔥 Setting up Firebase auth listener...');
+                
+                const unsubscribe = firebaseAuth.onAuthStateChanged((user) => {
+                    if (user) {
+                        console.log('✅ Firebase user signed in:', user.uid);
+                        setFirebaseUserId(user.uid);
+                        setFirebaseReady(true);
+                        
+                        // Start listening to playlists in real-time
+                        const unsubscribePlaylists = FirebaseDB.listenToPlaylists(user.uid, (firebasePlaylists) => {
+                            console.log('📡 Firebase real-time update:', firebasePlaylists.length, 'playlists');
+                            
+                            // Only update if we have playlists from Firebase
+                            if (firebasePlaylists.length > 0) {
+                                setPlaylists(firebasePlaylists);
+                                
+                                // If no active playlist, set first one
+                                if (!activePlaylist && firebasePlaylists.length > 0) {
+                                    setActivePlaylist(firebasePlaylists[0].id);
+                                }
+                            }
+                        });
+                        
+                        // Store unsubscribe function
+                        return unsubscribePlaylists;
+                    } else {
+                        console.log('❌ Firebase user signed out');
+                        setFirebaseUserId(null);
+                        setFirebaseReady(false);
+                    }
+                });
+                
+                return () => unsubscribe();
             }, []);
 
             // FIXED: Load data with proper async/await
@@ -1743,8 +1932,19 @@
                 if (modalInput.trim()) {
                     debugLog('Creating playlist:', modalInput);
                     const id = Date.now();
-                    const newPlaylist = { id, name: modalInput.trim(), songs: [] };
+                    const newPlaylist = { id, name: modalInput.trim(), songs: [], createdAt: id };
+                    
+                    // Save to IndexedDB
                     await DB.save('playlists', newPlaylist);
+                    
+                    // Also save to Firebase if connected
+                    if (firebaseUserId) {
+                        await FirebaseDB.savePlaylist(firebaseUserId, `pl_${id}`, {
+                            name: newPlaylist.name,
+                            createdAt: id
+                        });
+                    }
+                    
                     setPlaylists([...playlists, newPlaylist]);
                     openPlaylist(id);
                     setShowModal(null);
@@ -1778,6 +1978,11 @@
                         if (!s.isUrl) await DB.delete('songs', s.id);
                     }
                     await DB.delete('playlists', id);
+                    
+                    // Also delete from Firebase if connected
+                    if (firebaseUserId) {
+                        await FirebaseDB.deletePlaylist(firebaseUserId, `pl_${id}`);
+                    }
                     
                     // Track deletion
                     const deletedData = await DB.get('settings', 'deletedItems') || { key: 'deletedItems', value: { playlists: [], songs: {} } };
@@ -1826,6 +2031,17 @@
                     };
                     await DB.save('songs', { id: shortId, blob: file });
                     playlist.songs.push(song);
+                    
+                    // Also save to Firebase if connected
+                    if (firebaseUserId) {
+                        await FirebaseDB.saveSong(firebaseUserId, `pl_${activePlaylist}`, shortId, {
+                            name: songName,
+                            driveFileId: shortId,
+                            isUrl: false,
+                            position: playlist.songs.length - 1,
+                            createdAt: Date.now()
+                        });
+                    }
                 }
                 
                 // Save playlist immediately
@@ -1856,15 +2072,32 @@
                 if (!playlist) return;
                 
                 const filename = modalInput.split('/').pop().split('?')[0] || 'Audio';
-                playlist.songs.push({
-                    id: generateShortId(), // Short 4-char ID
-                    name: filename.replace(/\.[^/.]+$/, ''),
+                const songId = generateShortId();
+                const songName = filename.replace(/\.[^/.]+$/, '');
+                
+                const newSong = {
+                    id: songId,
+                    name: songName,
                     url: modalInput,
                     isUrl: true
-                });
+                };
+                
+                playlist.songs.push(newSong);
                 
                 // Save playlist immediately
                 await DB.save('playlists', playlist);
+                
+                // Also save to Firebase if connected
+                if (firebaseUserId) {
+                    await FirebaseDB.saveSong(firebaseUserId, `pl_${activePlaylist}`, songId, {
+                        name: songName,
+                        driveFileId: null,
+                        isUrl: true,
+                        url: modalInput,
+                        position: playlist.songs.length - 1,
+                        createdAt: Date.now()
+                    });
+                }
                 
                 setPlaylists([...playlists]);
                 setModalInput('');
@@ -1913,6 +2146,11 @@
                     const s = p.songs.find(x => x.id === id);
                     if (s && !s.isUrl) await DB.delete('songs', s.id);
                     p.songs = p.songs.filter(x => x.id !== id);
+                    
+                    // Also delete from Firebase if connected
+                    if (firebaseUserId) {
+                        await FirebaseDB.deleteSong(firebaseUserId, `pl_${pid}`, id);
+                    }
                     
                     // Track deletion
                     const deletedData = await DB.get('settings', 'deletedItems') || { key: 'deletedItems', value: { playlists: [], songs: {} } };
@@ -2739,6 +2977,121 @@
                                 React.createElement('div', { style: { fontSize: '14px', lineHeight: '1.5', textAlign: 'center', opacity: 0.8 } }, 
                                     'Sign in to sync your music library across all devices'
                                 )
+                            ),
+                            
+                            // Firebase Real-Time Sync Section
+                            isFirebaseConfigured && React.createElement('div', { 
+                                style: { 
+                                    marginTop: '24px', 
+                                    padding: '20px', 
+                                    background: darkMode ? 'rgba(29, 185, 84, 0.1)' : 'rgba(29, 185, 84, 0.15)', 
+                                    borderRadius: '12px',
+                                    border: `1px solid ${darkMode ? 'rgba(29, 185, 84, 0.3)' : 'rgba(29, 185, 84, 0.4)'}`
+                                } 
+                            },
+                                React.createElement('div', { 
+                                    style: { 
+                                        fontSize: '16px', 
+                                        fontWeight: '600', 
+                                        marginBottom: '12px', 
+                                        textAlign: 'center',
+                                        color: '#1DB954'
+                                    } 
+                                }, '🔥 Firebase Real-Time Sync'),
+                                
+                                !firebaseUserId ? 
+                                    React.createElement('div', {},
+                                        React.createElement('button', {
+                                            onClick: async () => {
+                                                try {
+                                                    setSyncStatus('Signing in to Firebase...');
+                                                    
+                                                    // Sign in anonymously
+                                                    const result = await firebaseAuth.signInAnonymously();
+                                                    const userId = result.user.uid;
+                                                    
+                                                    setSyncStatus('Migrating playlists to Firebase...');
+                                                    
+                                                    // Migrate local playlists to Firebase
+                                                    let migratedCount = 0;
+                                                    for (const playlist of playlists) {
+                                                        const playlistId = `pl_${playlist.id}`;
+                                                        
+                                                        await FirebaseDB.savePlaylist(userId, playlistId, {
+                                                            name: playlist.name,
+                                                            createdAt: playlist.createdAt || Date.now()
+                                                        });
+                                                        
+                                                        for (let i = 0; i < playlist.songs.length; i++) {
+                                                            const song = playlist.songs[i];
+                                                            await FirebaseDB.saveSong(userId, playlistId, song.id, {
+                                                                name: song.name,
+                                                                driveFileId: song.id,
+                                                                isUrl: song.isUrl || false,
+                                                                url: song.url || null,
+                                                                position: i,
+                                                                createdAt: Date.now()
+                                                            });
+                                                        }
+                                                        migratedCount++;
+                                                    }
+                                                    
+                                                    setSyncStatus('');
+                                                    setFirebaseUserId(userId);
+                                                    
+                                                    alert(`✅ Firebase Sync Enabled!\n\n${migratedCount} playlists synced.\n\nChanges will now sync instantly across all your devices!`);
+                                                    
+                                                } catch (error) {
+                                                    console.error('Firebase sign-in error:', error);
+                                                    setSyncStatus('');
+                                                    alert(`❌ Firebase sign-in failed:\n${error.message}`);
+                                                }
+                                            },
+                                            className: 'btn-primary',
+                                            style: { width: '100%', marginBottom: '10px' },
+                                            disabled: syncing
+                                        }, syncStatus || '🚀 Enable Real-Time Sync'),
+                                        
+                                        React.createElement('div', { 
+                                            style: { 
+                                                fontSize: '12px', 
+                                                lineHeight: '1.4', 
+                                                marginTop: '12px', 
+                                                opacity: 0.8, 
+                                                textAlign: 'center' 
+                                            } 
+                                        }, 'Changes appear instantly on all devices. No manual sync needed!')
+                                    )
+                                :
+                                    React.createElement('div', { style: { textAlign: 'center' } },
+                                        React.createElement('div', { 
+                                            style: { 
+                                                fontSize: '14px', 
+                                                color: '#1DB954', 
+                                                marginBottom: '10px',
+                                                fontWeight: '600'
+                                            } 
+                                        }, '✅ Real-Time Sync Active'),
+                                        
+                                        React.createElement('div', { 
+                                            style: { 
+                                                fontSize: '12px', 
+                                                opacity: 0.7,
+                                                marginBottom: '12px'
+                                            } 
+                                        }, `User ID: ${firebaseUserId.substring(0, 8)}...`),
+                                        
+                                        React.createElement('button', {
+                                            onClick: () => {
+                                                if (confirm('Sign out from Firebase?\n\nYour data will remain in Firebase, but real-time sync will stop on this device.')) {
+                                                    firebaseAuth.signOut();
+                                                    setFirebaseUserId(null);
+                                                }
+                                            },
+                                            className: 'btn-secondary',
+                                            style: { width: '100%', fontSize: '12px' }
+                                        }, 'Sign Out from Firebase')
+                                    )
                             )
                         )
                     ),
