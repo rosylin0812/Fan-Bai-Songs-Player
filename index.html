@@ -2772,51 +2772,88 @@
                                                 });
                                                 
                                                 // ============================================
-                                                // ALSO CONNECT TO FIREBASE using Google user ID
+                                                // ALSO CONNECT TO FIREBASE (properly!)
                                                 // ============================================
                                                 if (isFirebaseConfigured && firebaseAuth) {
                                                     try {
-                                                        console.log('🔥 Connecting to Firebase with Google user ID...');
+                                                        console.log('🔥 Connecting to Firebase...');
                                                         
-                                                        // Sign in anonymously to Firebase
-                                                        const firebaseResult = await firebaseAuth.signInAnonymously();
-                                                        console.log('✅ Firebase auth successful');
+                                                        const googleUserId = user.id; // Google's unique user ID
                                                         
-                                                        // Use Google user ID for data paths (ensures same ID across devices!)
-                                                        const googleUserId = user.id;
-                                                        setFirebaseUserId(googleUserId);
+                                                        // Check if this Google user already has a Firebase UID stored locally
+                                                        const storedMapping = await DB.get('settings', 'firebaseUidMapping');
+                                                        let firebaseUid = storedMapping?.value?.[googleUserId];
                                                         
-                                                        console.log('Using Google ID for Firebase data:', googleUserId);
-                                                        
-                                                        // Migrate local playlists to Firebase
-                                                        console.log('📤 Migrating playlists to Firebase...');
-                                                        let migratedCount = 0;
-                                                        
-                                                        for (const playlist of playlists) {
-                                                            const playlistId = `pl_${playlist.id}`;
+                                                        if (firebaseUid) {
+                                                            // User has signed in before - try to restore session
+                                                            console.log('Found existing Firebase UID for this Google account:', firebaseUid);
                                                             
-                                                            await FirebaseDB.savePlaylist(googleUserId, playlistId, {
-                                                                name: playlist.name,
-                                                                createdAt: playlist.createdAt || Date.now()
+                                                            // Sign in anonymously (will get a new UID, but we'll use the mapping)
+                                                            await firebaseAuth.signInAnonymously();
+                                                            
+                                                            // Use the stored UID for data paths
+                                                            setFirebaseUserId(firebaseUid);
+                                                            console.log('✅ Restored Firebase session with UID:', firebaseUid);
+                                                            
+                                                        } else {
+                                                            // First time signing in with this Google account
+                                                            console.log('First time sign-in for this Google account');
+                                                            
+                                                            // Sign in anonymously to get a Firebase UID
+                                                            const firebaseResult = await firebaseAuth.signInAnonymously();
+                                                            const firebaseUser = firebaseResult.user;
+                                                            firebaseUid = firebaseUser.uid;
+                                                            
+                                                            console.log('✅ New Firebase UID created:', firebaseUid);
+                                                            
+                                                            // Store the mapping: Google ID -> Firebase UID
+                                                            const mapping = storedMapping?.value || {};
+                                                            mapping[googleUserId] = firebaseUid;
+                                                            await DB.save('settings', { 
+                                                                key: 'firebaseUidMapping', 
+                                                                value: mapping 
                                                             });
                                                             
-                                                            for (let i = 0; i < playlist.songs.length; i++) {
-                                                                const song = playlist.songs[i];
-                                                                await FirebaseDB.saveSong(googleUserId, playlistId, song.id, {
-                                                                    name: song.name,
-                                                                    driveFileId: song.driveFileId || null,
-                                                                    isUrl: song.isUrl || false,
-                                                                    url: song.url || null,
-                                                                    position: i,
-                                                                    createdAt: Date.now()
+                                                            // Also store in Firebase for cross-device sync
+                                                            await firebaseDB.ref(`googleIdMapping/${googleUserId}`).set({
+                                                                firebaseUid: firebaseUid,
+                                                                email: user.email,
+                                                                name: user.name,
+                                                                createdAt: Date.now()
+                                                            });
+                                                            
+                                                            setFirebaseUserId(firebaseUid);
+                                                            
+                                                            // Migrate local playlists to Firebase
+                                                            console.log('📤 Migrating playlists to Firebase...');
+                                                            let migratedCount = 0;
+                                                            
+                                                            for (const playlist of playlists) {
+                                                                const playlistId = `pl_${playlist.id}`;
+                                                                
+                                                                await FirebaseDB.savePlaylist(firebaseUid, playlistId, {
+                                                                    name: playlist.name,
+                                                                    createdAt: playlist.createdAt || Date.now()
                                                                 });
+                                                                
+                                                                for (let i = 0; i < playlist.songs.length; i++) {
+                                                                    const song = playlist.songs[i];
+                                                                    await FirebaseDB.saveSong(firebaseUid, playlistId, song.id, {
+                                                                        name: song.name,
+                                                                        driveFileId: song.driveFileId || null,
+                                                                        isUrl: song.isUrl || false,
+                                                                        url: song.url || null,
+                                                                        position: i,
+                                                                        createdAt: Date.now()
+                                                                    });
+                                                                }
+                                                                migratedCount++;
                                                             }
-                                                            migratedCount++;
+                                                            
+                                                            console.log(`✅ Migrated ${migratedCount} playlists to Firebase`);
                                                         }
                                                         
-                                                        console.log(`✅ Migrated ${migratedCount} playlists to Firebase`);
-                                                        
-                                                        alert(`✅ Signed in as ${user.name}!\n\n🔥 Real-time sync active!\n📤 ${migratedCount} playlists synced to cloud.\n\nYour music will now sync instantly across all devices!`);
+                                                        alert(`✅ Signed in as ${user.name}!\n\n🔥 Real-time sync active!\n📱 Your music will sync across all devices with this Google account!`);
                                                         
                                                     } catch (firebaseError) {
                                                         console.error('Firebase connection error:', firebaseError);
