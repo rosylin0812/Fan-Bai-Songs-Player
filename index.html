@@ -823,7 +823,7 @@
                     if (data) {
                         // Convert Firebase object to array
                         const playlistsArray = Object.keys(data).map(playlistId => ({
-                            id: playlistId,
+                            id: playlistId.replace('pl_', ''), // Remove pl_ prefix for local state
                             name: data[playlistId].name,
                             createdAt: data[playlistId].createdAt,
                             updatedAt: data[playlistId].updatedAt,
@@ -1180,6 +1180,32 @@
             useEffect(() => { 
                 loadData(); 
             }, []);
+
+            // Firebase Real-Time Listener
+            useEffect(() => {
+                if (!firebaseUserId || !isFirebaseConfigured) return;
+                
+                console.log('🔥 Starting Firebase real-time listener for UID:', firebaseUserId);
+                
+                const unsubscribe = FirebaseDB.listenToPlaylists(firebaseUserId, (firebasePlaylists) => {
+                    console.log('📡 Firebase real-time update received:', firebasePlaylists.length, 'playlists');
+                    
+                    // Update playlists from Firebase
+                    if (firebasePlaylists.length > 0) {
+                        setPlaylists(firebasePlaylists);
+                        
+                        // If no active playlist, set first one
+                        if (!activePlaylist && firebasePlaylists.length > 0) {
+                            setActivePlaylist(firebasePlaylists[0].id.replace('pl_', ''));
+                        }
+                    }
+                });
+                
+                return () => {
+                    console.log('🔥 Stopping Firebase listener');
+                    unsubscribe();
+                };
+            }, [firebaseUserId]);
 
             const loadData = async () => {
                 try {
