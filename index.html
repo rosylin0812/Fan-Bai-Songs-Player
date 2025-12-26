@@ -2814,11 +2814,17 @@
                                                                 value: mapping 
                                                             });
                                                             
-                                                            // Also store in Firebase for cross-device sync
+                                                            // Store BOTH directions in Firebase for secure validation
+                                                            // 1. Google ID → Firebase UID (for device lookup)
                                                             await firebaseDB.ref(`googleIdMapping/${googleUserId}`).set({
                                                                 firebaseUid: firebaseUid,
-                                                                email: user.email,
-                                                                name: user.name,
+                                                                createdAt: Date.now()
+                                                                // NO email/name for privacy!
+                                                            });
+                                                            
+                                                            // 2. Firebase UID → Google ID (for security rules validation)
+                                                            await firebaseDB.ref(`userAuth/${firebaseUid}`).set({
+                                                                googleId: googleUserId,
                                                                 createdAt: Date.now()
                                                             });
                                                             
