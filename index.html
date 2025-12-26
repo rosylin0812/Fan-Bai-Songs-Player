@@ -1901,7 +1901,8 @@
                             
                             const folderId = await DriveAPI.ensureFolder(accessToken);
                             const fileName = `${songName}-${shortId}${file.name.match(/\.[^/.]+$/)?.[0] || '.mp3'}`;
-                            driveFileId = await DriveAPI.uploadFile(accessToken, folderId, fileName, file);
+                            const uploadResponse = await DriveAPI.uploadFile(accessToken, folderId, fileName, file);
+                            driveFileId = uploadResponse.id; // Extract just the ID string
                             
                             debugLog('✅ Uploaded to Drive:', driveFileId);
                             setSyncStatus('');
