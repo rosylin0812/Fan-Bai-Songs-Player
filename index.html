@@ -699,11 +699,150 @@
 <body>
     <div id="root"></div>
 
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    
+    <!-- React -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
     <script>
         const { useState, useEffect, useRef } = React;
+        const PRIMARY = '#1DB954';
+
+        // ============================================
+        // FIREBASE CONFIGURATION
+        // ============================================
+        // TODO: Replace with your Firebase config from Firebase Console
+        // Instructions: See FIREBASE_SETUP_INSTRUCTIONS.md
+        const firebaseConfig = {
+          apiKey: "AIzaSyAA6AeCrTWe8_8sYTdnHffNuaPbbmUIftQ",
+          authDomain: "fan-bai-song-player.firebaseapp.com",
+          databaseURL: "https://fan-bai-song-player-default-rtdb.firebaseio.com",
+          projectId: "fan-bai-song-player",
+          storageBucket: "fan-bai-song-player.firebasestorage.app",
+          messagingSenderId: "929176647542",
+          appId: "1:929176647542:web:d0a385183a71ca358fec57"
+        };
+
+        // Initialize Firebase
+        let firebaseApp, firebaseDB, firebaseAuth;
+        let isFirebaseConfigured = false;
+
+        try {
+            // Check if config is filled in
+            if (firebaseConfig.apiKey !== "YOUR_API_KEY_HERE") {
+                firebaseApp = firebase.initializeApp(firebaseConfig);
+                firebaseDB = firebase.database();
+                firebaseAuth = firebase.auth();
+                isFirebaseConfigured = true;
+                console.log('✅ Firebase initialized successfully');
+            } else {
+                console.warn('⚠️ Firebase not configured. Please add your Firebase config.');
+                console.warn('📖 See instructions at the top of this file');
+            }
+        } catch (error) {
+            console.error('❌ Firebase initialization error:', error);
+            isFirebaseConfigured = false;
+        }
+
+        // ============================================
+        // FIREBASE DATABASE HELPERS
+        // ============================================
+        const FirebaseDB = {
+            // Save playlist to Firebase
+            async savePlaylist(userId, playlistId, playlistData) {
+                if (!isFirebaseConfigured) return;
+                try {
+                    await firebaseDB.ref(`users/${userId}/playlists/${playlistId}`).set({
+                        name: playlistData.name,
+                        createdAt: playlistData.createdAt || Date.now(),
+                        updatedAt: Date.now()
+                    });
+                    console.log('✅ Playlist saved to Firebase:', playlistData.name);
+                } catch (error) {
+                    console.error('❌ Error saving playlist:', error);
+                    throw error;
+                }
+            },
+
+            // Save song to Firebase
+            async saveSong(userId, playlistId, songId, songData) {
+                if (!isFirebaseConfigured) return;
+                try {
+                    await firebaseDB.ref(`users/${userId}/playlists/${playlistId}/songs/${songId}`).set({
+                        name: songData.name,
+                        driveFileId: songData.driveFileId || songId,
+                        isUrl: songData.isUrl || false,
+                        url: songData.url || null,
+                        position: songData.position || 0,
+                        createdAt: songData.createdAt || Date.now()
+                    });
+                    console.log('✅ Song saved to Firebase:', songData.name);
+                } catch (error) {
+                    console.error('❌ Error saving song:', error);
+                    throw error;
+                }
+            },
+
+            // Delete playlist from Firebase
+            async deletePlaylist(userId, playlistId) {
+                if (!isFirebaseConfigured) return;
+                try {
+                    await firebaseDB.ref(`users/${userId}/playlists/${playlistId}`).remove();
+                    console.log('✅ Playlist deleted from Firebase');
+                } catch (error) {
+                    console.error('❌ Error deleting playlist:', error);
+                    throw error;
+                }
+            },
+
+            // Delete song from Firebase
+            async deleteSong(userId, playlistId, songId) {
+                if (!isFirebaseConfigured) return;
+                try {
+                    await firebaseDB.ref(`users/${userId}/playlists/${playlistId}/songs/${songId}`).remove();
+                    console.log('✅ Song deleted from Firebase');
+                } catch (error) {
+                    console.error('❌ Error deleting song:', error);
+                    throw error;
+                }
+            },
+
+            // Listen to all playlists (real-time)
+            listenToPlaylists(userId, callback) {
+                if (!isFirebaseConfigured) return () => {};
+                const ref = firebaseDB.ref(`users/${userId}/playlists`);
+                
+                ref.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        // Convert Firebase object to array
+                        const playlistsArray = Object.keys(data).map(playlistId => ({
+                            id: playlistId,
+                            name: data[playlistId].name,
+                            createdAt: data[playlistId].createdAt,
+                            updatedAt: data[playlistId].updatedAt,
+                            songs: data[playlistId].songs ? 
+                                Object.keys(data[playlistId].songs).map(songId => ({
+                                    id: songId,
+                                    ...data[playlistId].songs[songId]
+                                })).sort((a, b) => a.position - b.position)
+                                : []
+                        }));
+                        callback(playlistsArray);
+                    } else {
+                        callback([]);
+                    }
+                });
+
+                // Return unsubscribe function
+                return () => ref.off();
+            }
+        };
+
         const PRIMARY = '#1DB954';
 
         // Debug logging helper
@@ -973,6 +1112,10 @@
             const [editingPlaylistName, setEditingPlaylistName] = useState('');
             const [editingSong, setEditingSong] = useState(null);
             const [editingSongName, setEditingSongName] = useState('');
+            
+            // Firebase state
+            const [firebaseUserId, setFirebaseUserId] = useState(null);
+            const [firebaseReady, setFirebaseReady] = useState(false);
             
             // Sync state variables
             const [isSignedIn, setIsSignedIn] = useState(false);
