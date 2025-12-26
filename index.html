@@ -2811,18 +2811,20 @@
                                         }
                                     }, '❌ Cancel Sync')
                                 ) : (
-                                    React.createElement('button', { 
-                                        onClick: handleSync,
-                                        className: 'btn-primary',
+                                    // Firebase handles sync automatically!
+                                    React.createElement('div', { 
                                         style: { 
                                             width: '100%', 
                                             fontSize: '13px', 
                                             padding: '12px 20px', 
                                             marginBottom: '8px',
-                                            background: 'linear-gradient(135deg, #1e90ff 0%, #4169e1 100%)',
-                                            boxShadow: '0 4px 15px rgba(30, 144, 255, 0.4)'
+                                            background: 'rgba(29, 185, 84, 0.1)',
+                                            border: '1px solid rgba(29, 185, 84, 0.3)',
+                                            borderRadius: '8px',
+                                            textAlign: 'center',
+                                            color: '#1DB954'
                                         }
-                                    }, 'Sync Now')
+                                    }, '✅ Auto-Sync Active (Firebase)')
                                 ),
                                 
                                 // Sync status (when syncing)
