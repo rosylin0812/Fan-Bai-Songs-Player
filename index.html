@@ -1167,27 +1167,27 @@
                     // Welcome page
                     welcomeTitle: 'Music Player',
                     welcomeSubtitle: 'Your music, everywhere',
-                    signInGoogle: 'Sign in with Google',
+                    signInGoogle: t.signIn,
                     signInDesc: 'Sync across all devices',
                     continueGuest: 'Continue as Guest',
                     continueDesc: 'Local storage only',
                     
                     // Sidebar
-                    home: 'Home',
+                    home: t.home,
                     createPlaylist: 'Create Playlist',
                     backupShare: 'Backup & Share',
                     search: 'Search...',
-                    yourLibrary: 'Your Library',
+                    yourLibrary: t.yourLibrary,
                     guestMode: 'Guest Mode',
-                    signIn: 'Sign in with Google',
-                    signOut: 'Sign Out',
+                    signIn: t.signIn,
+                    signOut: t.signOut,
                     
                     // Playlist
-                    uploadFiles: 'Upload Files',
-                    addUrl: 'Add URL',
+                    uploadFiles: t.uploadFiles,
+                    addUrl: t.addUrl,
                     tracks: 'tracks',
                     noTracksYet: 'No tracks yet',
-                    uploadOrAdd: 'Upload audio files or add streaming URLs',
+                    uploadOrAdd: t.uploadOrAdd,
                     
                     // Modals
                     createPlaylistTitle: 'Create Playlist',
@@ -1201,9 +1201,9 @@
                     importPlaylists: 'Import Playlists',
                     close: 'Close',
                     deletePlaylist: 'Delete Playlist?',
-                    deletePlaylistMsg: 'This will delete all songs in this playlist. This action cannot be undone.',
+                    deletePlaylistMsg: t.deletePlaylistMsg,
                     deleteTrack: 'Delete Track?',
-                    deleteTrackMsg: 'This action cannot be undone.',
+                    deleteTrackMsg: t.deleteTrackMsg,
                     delete: 'Delete Playlist',
                     deleteButton: 'Delete',
                     
@@ -1216,17 +1216,17 @@
                     
                     // Messages
                     signedOut: '✅ Signed out successfully!',
-                    offlineMode: 'Offline Mode - Only local songs available',
-                    loadingLibrary: 'Loading your library...',
-                    pleaseWait: 'Please wait',
+                    offlineMode: t.offlineMode,
+                    loadingLibrary: t.loadingLibrary,
+                    pleaseWait: t.pleaseWait,
                     
                     // Drag and drop
                     dropFiles: 'Drop files here to upload',
                     
                     // Status
                     apiCalls: 'API calls today',
-                    streaming: 'Streaming',
-                    local: 'Local'
+                    streaming: t.streaming,
+                    local: t.local
                 },
                 zh: {
                     // Welcome page  
@@ -2881,9 +2881,58 @@
                             padding: '40px 30px',
                             background: darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
                             borderRadius: '20px',
-                            backdropFilter: 'blur(10px)'
+                            backdropFilter: 'blur(10px)',
+                            position: 'relative'
                         } 
                     },
+                        // Language + theme toggle in top right
+                        React.createElement('div', { 
+                            style: { 
+                                position: 'absolute',
+                                top: '20px',
+                                right: '20px',
+                                display: 'flex',
+                                gap: '8px',
+                                alignItems: 'center'
+                            }
+                        },
+                            // Language buttons
+                            React.createElement('button', {
+                                onClick: () => setLanguage('zh'),
+                                style: {
+                                    padding: '4px 10px',
+                                    fontSize: '12px',
+                                    fontWeight: language === 'zh' ? '700' : '500',
+                                    background: language === 'zh' ? (darkMode ? 'rgba(29, 185, 84, 0.2)' : 'rgba(29, 185, 84, 0.15)') : 'transparent',
+                                    color: language === 'zh' ? '#1DB954' : (darkMode ? '#b3b3b3' : '#666'),
+                                    border: language === 'zh' ? '1px solid #1DB954' : `1px solid ${darkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}`,
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }
+                            }, '中'),
+                            React.createElement('button', {
+                                onClick: () => setLanguage('en'),
+                                style: {
+                                    padding: '4px 10px',
+                                    fontSize: '12px',
+                                    fontWeight: language === 'en' ? '700' : '500',
+                                    background: language === 'en' ? (darkMode ? 'rgba(29, 185, 84, 0.2)' : 'rgba(29, 185, 84, 0.15)') : 'transparent',
+                                    color: language === 'en' ? '#1DB954' : (darkMode ? '#b3b3b3' : '#666'),
+                                    border: language === 'en' ? '1px solid #1DB954' : `1px solid ${darkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}`,
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }
+                            }, 'EN'),
+                            // Theme toggle
+                            React.createElement('button', {
+                                onClick: () => setDarkMode(!darkMode),
+                                className: 'icon-btn icon-btn-small',
+                                style: { marginLeft: '4px' }
+                            }, darkMode ? React.createElement(Icons.Sun) : React.createElement(Icons.Moon))
+                        ),
+                        
                         React.createElement('div', { 
                             style: { fontSize: '48px', marginBottom: '16px' } 
                         }, '🎵'),
@@ -2895,7 +2944,7 @@
                                 fontWeight: 'bold', 
                                 marginBottom: '12px' 
                             } 
-                        }, 'Music Player'),
+                        }, t.welcomeTitle),
                         
                         React.createElement('p', { 
                             className: txtMuted,
@@ -2904,7 +2953,7 @@
                                 marginBottom: '40px',
                                 lineHeight: '1.6'
                             } 
-                        }, 'Your music, everywhere'),
+                        }, t.welcomeSubtitle),
                         
                         // Sign in with Google button
                         React.createElement('button', { 
@@ -2939,7 +2988,7 @@
                                 e.target.style.boxShadow = '0 4px 12px rgba(66, 133, 244, 0.4)';
                             }
                         }, 
-                            React.createElement('span', {}, '🔥 Sign in with Google'),
+                            React.createElement('span', {}, `🔥 ${t.signInGoogle}`),
                             React.createElement('div', { 
                                 style: { 
                                     fontSize: '13px', 
@@ -2947,7 +2996,7 @@
                                     marginTop: '4px',
                                     fontWeight: 'normal'
                                 } 
-                            }, 'Sync across all devices')
+                            }, t.signInDesc)
                         ),
                         
                         // Continue as Guest button
@@ -2976,7 +3025,7 @@
                                 e.target.style.background = darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
                             }
                         }, 
-                            React.createElement('span', {}, '📱 Continue as Guest'),
+                            React.createElement('span', {}, `📱 ${t.continueGuest}`),
                             React.createElement('div', { 
                                 style: { 
                                     fontSize: '13px', 
@@ -2984,7 +3033,7 @@
                                     marginTop: '4px',
                                     fontWeight: 'normal'
                                 } 
-                            }, 'Local storage only')
+                            }, t.continueDesc)
                         )
                     )
                 );
@@ -2994,8 +3043,8 @@
             if (loading) {
                 return React.createElement('div', { className: 'loading-overlay' },
                     React.createElement('div', { className: 'spinner' }),
-                    React.createElement('div', { style: { marginTop: '20px', fontSize: '18px' } }, 'Loading your library...'),
-                    React.createElement('div', { style: { marginTop: '8px', fontSize: '14px', opacity: 0.7 } }, 'Please wait')
+                    React.createElement('div', { style: { marginTop: '20px', fontSize: '18px' } }, t.loadingLibrary),
+                    React.createElement('div', { style: { marginTop: '8px', fontSize: '14px', opacity: 0.7 } }, t.pleaseWait)
                 );
             }
 
@@ -3030,7 +3079,7 @@
                                 type: 'text',
                                 value: modalInput,
                                 onChange: (e) => setModalInput(e.target.value),
-                                placeholder: 'Playlist name',
+                                placeholder: t.playlistName,
                                 className: 'mb-4',
                                 onKeyPress: (e) => e.key === 'Enter' && handleCreate(),
                                 autoFocus: true,
@@ -3048,11 +3097,11 @@
                                     onClick: () => setShowModal(null), 
                                     className: 'btn-secondary',
                                 style: { color: darkMode ? '#ffffff' : '#000000' }
-                                }, 'Cancel'),
+                                }, t.cancel),
                                 React.createElement('button', { 
                                     onClick: handleCreate, 
                                     className: 'btn-primary' 
-                                }, 'Create')
+                                }, t.create)
                             )
                         )
                     )
@@ -3062,7 +3111,7 @@
             return React.createElement('div', null,
                 // Offline banner
                 !isOnline && React.createElement('div', { className: 'offline-banner' },
-                    'Offline Mode - Only local songs available'
+                    t.offlineMode
                 ),
                 
                 // Audio element
@@ -3254,7 +3303,7 @@
                                 
                                 // Quota display
                                 React.createElement('div', { style: { fontSize: '12px', textAlign: 'center', opacity: 0.7, marginBottom: '8px' } },
-                                    `API calls today: ${quotaCalls}/20,000`
+                                    `${t.apiCalls}: ${quotaCalls}/20,000`
                                 ),
                                 
                                 // Sign out button
@@ -3267,11 +3316,11 @@
                                         setGoogleUserId(null);
                                         setQuotaCalls(0);
                                         await DB.delete('settings', 'googleAuth');
-                                        alert('✅ Signed out successfully!');
+                                        alert(t.signedOut);
                                     },
                                     className: 'btn-secondary',
                                     style: { width: '100%', fontSize: '12px', padding: '8px 16px', color: darkMode ? '#ffffff' : '#000000' }
-                                }, 'Sign Out'),
+                                }, t.signOut),
                                 
                                 // DEBUG INFO PANEL
                                 React.createElement('div', { 
@@ -3524,7 +3573,7 @@
                                     },          
                                     className: 'btn-primary',
                                     style: { width: '100%', fontSize: '13px', padding: '12px 20px', marginBottom: '12px' }
-                                }, 'Sign in with Google'),
+                                }, t.signIn),
                                 
                                 // Description below
                                 React.createElement('div', { style: { fontSize: '14px', lineHeight: '1.5', textAlign: 'center', opacity: 0.8 } }, 
@@ -3577,7 +3626,7 @@
                                 React.createElement('div', { 
                                     className: 'text-2xl font-bold mb-4',
                                     className: 'text-color'
-                                }, 'Your Playlists'),
+                                }, language === 'zh' ? '您的播放清單' : 'Your Playlists'),
                                 React.createElement('div', { className: 'playlist-grid' },
                                     filtered.map((p, index) => React.createElement('div', {
                                         key: p.id,
@@ -3619,7 +3668,7 @@
                                         }, p.name),
                                         React.createElement('div', { 
                                             className: 'text-sm text-muted'
-                                        }, `${p.songs.length} tracks`)
+                                        }, `${p.songs.length} ${t.tracks}`)
                                     )),
                                     
                                     // Empty state when no playlists
@@ -3693,7 +3742,7 @@
                                                 ),
                                                 React.createElement('div', { 
                                                     className: 'text-muted'
-                                                }, `${current.songs.length} tracks`)
+                                                }, `${current.songs.length} ${t.tracks}`)
                                             )
                                         )
                                     ),
@@ -3732,7 +3781,7 @@
                                         style: { display: 'flex', alignItems: 'center', gap: '8px' }
                                     }, 
                                         React.createElement(Icons.Link),
-                                        'Add URL'
+                                        t.addUrl
                                     )
                                 ),
                                 
@@ -3780,7 +3829,7 @@
                                                     }, s.name),
                                                     React.createElement('div', { 
                                                         className: 'text-sm text-muted'
-                                                    }, s.isUrl ? 'Streaming' : 'Local')
+                                                    }, s.isUrl ? t.streaming : t.local)
                                                 )
                                         ),
                                         editingSong !== s.id && React.createElement('button', {
@@ -3807,8 +3856,8 @@
                                         color: '#b3b3b3'
                                     }
                                 },
-                                    React.createElement('div', { className: 'text-xl mb-2' }, 'No tracks yet'),
-                                    React.createElement('div', {}, 'Upload audio files or add streaming URLs')
+                                    React.createElement('div', { className: 'text-xl mb-2' }, t.noTracksYet),
+                                    React.createElement('div', {}, t.uploadOrAdd)
                                 )
                             )
                         )
@@ -3827,12 +3876,12 @@
                     React.createElement('div', { className: `modal ${modalClass}` },
                         React.createElement('div', { 
                             className: 'text-2xl font-bold mb-4' 
-                        }, 'Create Playlist'),
+                        }, t.createPlaylist),
                         React.createElement('input', {
                             type: 'text',
                             value: modalInput,
                             onChange: (e) => setModalInput(e.target.value),
-                            placeholder: 'Playlist name',
+                            placeholder: t.playlistName,
                             className: 'mb-4',
                             onKeyPress: (e) => e.key === 'Enter' && handleCreate(),
                             autoFocus: true,
@@ -3850,11 +3899,11 @@
                                 onClick: () => setShowModal(null), 
                                 className: 'btn-secondary',
                                 style: { color: darkMode ? '#ffffff' : '#000000' }
-                            }, 'Cancel'),
+                            }, t.cancel),
                             React.createElement('button', { 
                                 onClick: handleCreate, 
                                 className: 'btn-primary' 
-                            }, 'Create')
+                            }, t.create)
                         )
                     )
                 ),
@@ -3869,7 +3918,7 @@
                     React.createElement('div', { className: `modal ${modalClass}` },
                         React.createElement('div', { 
                             className: 'text-2xl font-bold mb-4' 
-                        }, 'Add Streaming URL'),
+                        }, t.addStreamingUrl),
                         React.createElement('input', {
                             type: 'text',
                             value: modalInput,
@@ -3892,11 +3941,11 @@
                                 onClick: () => setShowModal(null), 
                                 className: 'btn-secondary',
                                 style: { color: darkMode ? '#ffffff' : '#000000' }
-                            }, 'Cancel'),
+                            }, t.cancel),
                             React.createElement('button', { 
                                 onClick: handleUrlSubmit, 
                                 className: 'btn-primary' 
-                            }, 'Add')
+                            }, t.add)
                         )
                     )
                 ),
@@ -3911,7 +3960,7 @@
                     React.createElement('div', { className: `modal ${modalClass}` },
                         React.createElement('div', { 
                             className: 'text-2xl font-bold mb-6' 
-                        }, 'Backup & Share'),
+                        }, t.backupShareTitle),
                         React.createElement('button', { 
                             onClick: () => { 
                                 exportData(); 
@@ -3919,7 +3968,7 @@
                             }, 
                             className: 'btn-primary mb-4', 
                             style: { width: '100%' } 
-                        }, 'Export Playlists'),
+                        }, t.exportPlaylists),
                         React.createElement('input', { 
                             type: 'file', 
                             accept: '.json', 
@@ -3937,7 +3986,7 @@
                                 cursor: 'pointer',
                                 color: darkMode ? '#ffffff' : '#000000'
                             } 
-                        }, 'Import Playlists'),
+                        }, t.importPlaylists),
                         React.createElement('button', { 
                             onClick: () => setShowModal(null), 
                             style: { 
@@ -3949,7 +3998,7 @@
                                 fontSize: '14px',
                                 color: '#b3b3b3'
                             } 
-                        }, 'Close')
+                        }, t.close)
                     )
                 ),
                 
@@ -3963,11 +4012,11 @@
                     React.createElement('div', { className: `modal ${modalClass}` },
                         React.createElement('div', { 
                             className: 'text-xl font-bold mb-4' 
-                        }, 'Delete Playlist?'),
+                        }, t.deletePlaylist),
                         React.createElement('div', { 
                             className: `mb-6`,
                             style: { color: '#b3b3b3' }
-                        }, 'This will delete all songs in this playlist. This action cannot be undone.'),
+                        }, t.deletePlaylistMsg),
                         React.createElement('div', { 
                             className: 'flex gap-3', 
                             style: { justifyContent: 'flex-end' } 
@@ -3976,7 +4025,7 @@
                                 onClick: () => setShowModal(null), 
                                 className: 'btn-secondary',
                                 style: { color: darkMode ? '#ffffff' : '#000000' }
-                            }, 'Cancel'),
+                            }, t.cancel),
                             React.createElement('button', { 
                                 onClick: () => deletePlaylist(showModal.id), 
                                 style: { 
@@ -3989,7 +4038,7 @@
                                     cursor: 'pointer',
                                     fontSize: '15px'
                                 } 
-                            }, 'Delete Playlist')
+                            }, t.delete)
                         )
                     )
                 ),
@@ -4004,11 +4053,11 @@
                     React.createElement('div', { className: `modal ${modalClass}` },
                         React.createElement('div', { 
                             className: 'text-xl font-bold mb-4' 
-                        }, 'Delete Track?'),
+                        }, t.deleteTrack),
                         React.createElement('div', { 
                             className: `mb-6`,
                             style: { color: '#b3b3b3' }
-                        }, 'This action cannot be undone.'),
+                        }, t.deleteTrackMsg),
                         React.createElement('div', { 
                             className: 'flex gap-3', 
                             style: { justifyContent: 'flex-end' } 
@@ -4017,7 +4066,7 @@
                                 onClick: () => setShowModal(null), 
                                 className: 'btn-secondary',
                                 style: { color: darkMode ? '#ffffff' : '#000000' }
-                            }, 'Cancel'),
+                            }, t.cancel),
                             React.createElement('button', { 
                                 onClick: () => deleteSong(showModal.id, showModal.pid), 
                                 style: { 
