@@ -14,19 +14,6 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <title>Music Player</title>
     
-    <!-- Eruda Mobile DevTools -->
-    <script>
-        (function() {
-            var script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/eruda';
-            script.onload = function() {
-                eruda.init();
-                console.log('🔧 Eruda DevTools loaded! Look for green button in bottom-right corner.');
-            };
-            document.head.appendChild(script);
-        })();
-    </script>
-    
     <style>
         * { 
             margin: 0; 
@@ -1202,19 +1189,15 @@
                 
                 const unsubscribe = FirebaseDB.listenToPlaylists(firebaseUserId, (firebasePlaylists) => {
                     console.log('📡 Firebase real-time update received:', firebasePlaylists.length, 'playlists');
-                    console.log('📡 Firebase data:', firebasePlaylists);
                     
-                    // ALWAYS update playlists from Firebase (even if empty!)
-                    setPlaylists(firebasePlaylists);
-                    
-                    // If no active playlist but playlists exist, set first one
-                    if (!activePlaylist && firebasePlaylists.length > 0) {
-                        setActivePlaylist(firebasePlaylists[0].id);
-                    }
-                    
-                    // If active playlist was deleted, switch to another
-                    if (activePlaylist && !firebasePlaylists.find(p => p.id === activePlaylist)) {
-                        setActivePlaylist(firebasePlaylists.length > 0 ? firebasePlaylists[0].id : null);
+                    // Update playlists from Firebase
+                    if (firebasePlaylists.length > 0) {
+                        setPlaylists(firebasePlaylists);
+                        
+                        // If no active playlist, set first one
+                        if (!activePlaylist && firebasePlaylists.length > 0) {
+                            setActivePlaylist(firebasePlaylists[0].id.replace('pl_', ''));
+                        }
                     }
                 });
                 
@@ -1797,9 +1780,6 @@
                             createdAt: id
                         });
                         debugLog('✅ Playlist synced to Firebase');
-                    } else {
-                        debugLog('⚠️ Not synced to Firebase - firebaseUserId is null');
-                        debugLog('⚠️ Make sure you clicked "Sign in with Google"');
                     }
                     
                     setPlaylists([...playlists, newPlaylist]);
@@ -1912,10 +1892,9 @@
                         try {
                             setSyncStatus(`Uploading ${songName} to Drive...`);
                             
-                            const folderId = await DriveAPI.ensureFolder(accessToken);
+                            const folderId = await DriveAPI.getOrCreateFolder(accessToken);
                             const fileName = `${songName}-${shortId}${file.name.match(/\.[^/.]+$/)?.[0] || '.mp3'}`;
-                            const uploadResponse = await DriveAPI.uploadFile(accessToken, folderId, fileName, file);
-                            driveFileId = uploadResponse.id; // Extract just the ID string
+                            driveFileId = await DriveAPI.uploadFile(accessToken, folderId, fileName, file);
                             
                             debugLog('✅ Uploaded to Drive:', driveFileId);
                             setSyncStatus('');
@@ -1947,8 +1926,6 @@
                             createdAt: Date.now()
                         });
                         debugLog('✅ Synced to Firebase');
-                    } else {
-                        debugLog('⚠️ Song NOT synced to Firebase - firebaseUserId is null');
                     }
                 }
                 
