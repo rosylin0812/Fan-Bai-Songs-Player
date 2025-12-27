@@ -1123,6 +1123,7 @@
             
             // Firebase state
             const [firebaseUserId, setFirebaseUserId] = useState(null);
+            const [googleUserId, setGoogleUserId] = useState(null); // Track Google ID
             const [firebaseReady, setFirebaseReady] = useState(false);
             
             // Sync state variables
@@ -2883,7 +2884,8 @@
                                 },
                                     React.createElement('div', { style: { fontWeight: 'bold', marginBottom: '6px', color: '#ff4444' } }, '🔧 DEBUG INFO'),
                                     React.createElement('div', {}, `isSignedIn: ${isSignedIn ? '✅ YES' : '❌ NO'}`),
-                                    React.createElement('div', {}, `firebaseUserId: ${firebaseUserId || '❌ NULL'}`),
+                                    React.createElement('div', {}, `Google ID: ${googleUserId || '❌ NULL'}`),
+                                    React.createElement('div', {}, `Firebase UID: ${firebaseUserId || '❌ NULL'}`),
                                     React.createElement('div', {}, `accessToken: ${accessToken ? '✅ EXISTS' : '❌ NULL'}`),
                                     React.createElement('div', {}, `Firebase config: ${isFirebaseConfigured ? '✅ YES' : '❌ NO'}`),
                                     firebaseError && React.createElement('div', { style: { color: '#ff4444', marginTop: '6px', fontWeight: 'bold' } }, `🔥 ERROR: ${firebaseError}`)
@@ -2945,18 +2947,19 @@
                                                     try {
                                                         console.log('🔥 Connecting to Firebase...');
                                                         
-                                                        const googleUserId = user.id; // Google's unique user ID
-                                                        console.log('Google User ID:', googleUserId);
+                                                        const gUserId = user.id; // Google's unique user ID
+                                                        setGoogleUserId(gUserId); // Save to state for debug panel
+                                                        console.log('Google User ID:', gUserId);
                                                         
                                                         // STEP 1: Check local storage for mapping
                                                         const storedMapping = await DB.get('settings', 'firebaseUidMapping');
-                                                        let firebaseUid = storedMapping?.value?.[googleUserId];
+                                                        let firebaseUid = storedMapping?.value?.[gUserId];
                                                         
                                                         // STEP 2: If not found locally, check Firebase database
                                                         if (!firebaseUid) {
                                                             console.log('No local mapping found, checking Firebase...');
                                                             try {
-                                                                const mappingSnapshot = await firebaseDB.ref(`googleIdMapping/${googleUserId}`).once('value');
+                                                                const mappingSnapshot = await firebaseDB.ref(`googleIdMapping/${gUserId}`).once('value');
                                                                 const mappingData = mappingSnapshot.val();
                                                                 if (mappingData && mappingData.firebaseUid) {
                                                                     firebaseUid = mappingData.firebaseUid;
@@ -2964,7 +2967,7 @@
                                                                     
                                                                     // Save to local storage for next time
                                                                     const mapping = storedMapping?.value || {};
-                                                                    mapping[googleUserId] = firebaseUid;
+                                                                    mapping[gUserId] = firebaseUid;
                                                                     await DB.save('settings', { 
                                                                         key: 'firebaseUidMapping', 
                                                                         value: mapping 
@@ -3001,7 +3004,7 @@
                                                             
                                                             // Store the mapping: Google ID -> Firebase UID
                                                             const mapping = storedMapping?.value || {};
-                                                            mapping[googleUserId] = firebaseUid;
+                                                            mapping[gUserId] = firebaseUid;
                                                             await DB.save('settings', { 
                                                                 key: 'firebaseUidMapping', 
                                                                 value: mapping 
@@ -3009,7 +3012,7 @@
                                                             
                                                             // Store BOTH directions in Firebase for secure validation
                                                             // 1. Google ID → Firebase UID (for device lookup)
-                                                            await firebaseDB.ref(`googleIdMapping/${googleUserId}`).set({
+                                                            await firebaseDB.ref(`googleIdMapping/${gUserId}`).set({
                                                                 firebaseUid: firebaseUid,
                                                                 createdAt: Date.now()
                                                                 // NO email/name for privacy!
@@ -3017,7 +3020,7 @@
                                                             
                                                             // 2. Firebase UID → Google ID (for security rules validation)
                                                             await firebaseDB.ref(`userAuth/${firebaseUid}`).set({
-                                                                googleId: googleUserId,
+                                                                googleId: gUserId,
                                                                 createdAt: Date.now()
                                                             });
                                                             
