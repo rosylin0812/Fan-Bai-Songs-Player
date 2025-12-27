@@ -2958,9 +2958,15 @@
                                                         // STEP 2: If not found locally, check Firebase database
                                                         if (!firebaseUid) {
                                                             console.log('No local mapping found, checking Firebase...');
+                                                            console.log('Looking for path: googleIdMapping/' + gUserId);
                                                             try {
-                                                                const mappingSnapshot = await firebaseDB.ref(`googleIdMapping/${gUserId}`).once('value');
+                                                                const mappingRef = firebaseDB.ref(`googleIdMapping/${gUserId}`);
+                                                                console.log('Firebase ref created, fetching data...');
+                                                                const mappingSnapshot = await mappingRef.once('value');
+                                                                console.log('Snapshot received, checking value...');
                                                                 const mappingData = mappingSnapshot.val();
+                                                                console.log('Mapping data from Firebase:', mappingData);
+                                                                
                                                                 if (mappingData && mappingData.firebaseUid) {
                                                                     firebaseUid = mappingData.firebaseUid;
                                                                     console.log('✅ Found Firebase UID in database:', firebaseUid);
@@ -2972,11 +2978,13 @@
                                                                         key: 'firebaseUidMapping', 
                                                                         value: mapping 
                                                                     });
+                                                                    console.log('✅ Saved mapping to local storage');
                                                                 } else {
-                                                                    console.log('No mapping found in Firebase either');
+                                                                    console.log('❌ No mapping found in Firebase (mappingData is null or missing firebaseUid)');
                                                                 }
                                                             } catch (error) {
-                                                                console.error('Error checking Firebase mapping:', error);
+                                                                console.error('❌ Error checking Firebase mapping:', error);
+                                                                console.error('Error details:', error.message, error.code);
                                                             }
                                                         }
                                                         
@@ -3009,20 +3017,25 @@
                                                                 key: 'firebaseUidMapping', 
                                                                 value: mapping 
                                                             });
+                                                            console.log('✅ Saved mapping to local IndexedDB');
                                                             
                                                             // Store BOTH directions in Firebase for secure validation
                                                             // 1. Google ID → Firebase UID (for device lookup)
+                                                            console.log('📤 Writing mapping to Firebase: googleIdMapping/' + gUserId);
                                                             await firebaseDB.ref(`googleIdMapping/${gUserId}`).set({
                                                                 firebaseUid: firebaseUid,
                                                                 createdAt: Date.now()
                                                                 // NO email/name for privacy!
                                                             });
+                                                            console.log('✅ Wrote googleIdMapping to Firebase');
                                                             
                                                             // 2. Firebase UID → Google ID (for security rules validation)
+                                                            console.log('📤 Writing userAuth mapping to Firebase');
                                                             await firebaseDB.ref(`userAuth/${firebaseUid}`).set({
                                                                 googleId: gUserId,
                                                                 createdAt: Date.now()
                                                             });
+                                                            console.log('✅ Wrote userAuth to Firebase');
                                                             
                                                             setFirebaseUserId(firebaseUid);
                                                             
