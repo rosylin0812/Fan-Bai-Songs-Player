@@ -14,6 +14,13 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <title>Music Player</title>
     
+    <!-- VConsole Mobile DevTools (Alternative to Eruda) -->
+    <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
+    <script>
+        var vConsole = new window.VConsole();
+        console.log('🔧 VConsole loaded! Look for green button in bottom-right.');
+    </script>
+    
     <style>
         * { 
             margin: 0; 
@@ -1189,15 +1196,19 @@
                 
                 const unsubscribe = FirebaseDB.listenToPlaylists(firebaseUserId, (firebasePlaylists) => {
                     console.log('📡 Firebase real-time update received:', firebasePlaylists.length, 'playlists');
+                    console.log('📡 Firebase data:', firebasePlaylists);
                     
-                    // Update playlists from Firebase
-                    if (firebasePlaylists.length > 0) {
-                        setPlaylists(firebasePlaylists);
-                        
-                        // If no active playlist, set first one
-                        if (!activePlaylist && firebasePlaylists.length > 0) {
-                            setActivePlaylist(firebasePlaylists[0].id.replace('pl_', ''));
-                        }
+                    // ALWAYS update playlists from Firebase (even if empty!)
+                    setPlaylists(firebasePlaylists);
+                    
+                    // If no active playlist but playlists exist, set first one
+                    if (!activePlaylist && firebasePlaylists.length > 0) {
+                        setActivePlaylist(firebasePlaylists[0].id);
+                    }
+                    
+                    // If active playlist was deleted, switch to another
+                    if (activePlaylist && !firebasePlaylists.find(p => p.id === activePlaylist)) {
+                        setActivePlaylist(firebasePlaylists.length > 0 ? firebasePlaylists[0].id : null);
                     }
                 });
                 
@@ -1780,6 +1791,9 @@
                             createdAt: id
                         });
                         debugLog('✅ Playlist synced to Firebase');
+                    } else {
+                        debugLog('⚠️ Not synced to Firebase - firebaseUserId is null');
+                        debugLog('⚠️ Make sure you clicked "Sign in with Google"');
                     }
                     
                     setPlaylists([...playlists, newPlaylist]);
@@ -1892,9 +1906,10 @@
                         try {
                             setSyncStatus(`Uploading ${songName} to Drive...`);
                             
-                            const folderId = await DriveAPI.getOrCreateFolder(accessToken);
+                            const folderId = await DriveAPI.ensureFolder(accessToken);
                             const fileName = `${songName}-${shortId}${file.name.match(/\.[^/.]+$/)?.[0] || '.mp3'}`;
-                            driveFileId = await DriveAPI.uploadFile(accessToken, folderId, fileName, file);
+                            const uploadResponse = await DriveAPI.uploadFile(accessToken, folderId, fileName, file);
+                            driveFileId = uploadResponse.id; // Extract just the ID string
                             
                             debugLog('✅ Uploaded to Drive:', driveFileId);
                             setSyncStatus('');
@@ -1926,6 +1941,8 @@
                             createdAt: Date.now()
                         });
                         debugLog('✅ Synced to Firebase');
+                    } else {
+                        debugLog('⚠️ Song NOT synced to Firebase - firebaseUserId is null');
                     }
                 }
                 
@@ -2849,7 +2866,26 @@
                                     },
                                     className: 'btn-secondary',
                                     style: { width: '100%', fontSize: '12px', padding: '8px 16px', color: darkMode ? '#ffffff' : '#000000' }
-                                }, 'Sign Out')
+                                }, 'Sign Out'),
+                                
+                                // DEBUG INFO PANEL
+                                React.createElement('div', { 
+                                    style: { 
+                                        marginTop: '12px',
+                                        padding: '12px',
+                                        background: darkMode ? 'rgba(255, 0, 0, 0.1)' : 'rgba(255, 0, 0, 0.05)',
+                                        border: '1px solid rgba(255, 0, 0, 0.3)',
+                                        borderRadius: '8px',
+                                        fontSize: '11px',
+                                        fontFamily: 'monospace'
+                                    }
+                                },
+                                    React.createElement('div', { style: { fontWeight: 'bold', marginBottom: '6px', color: '#ff4444' } }, '🔧 DEBUG INFO'),
+                                    React.createElement('div', {}, `isSignedIn: ${isSignedIn ? '✅ YES' : '❌ NO'}`),
+                                    React.createElement('div', {}, `firebaseUserId: ${firebaseUserId || '❌ NULL'}`),
+                                    React.createElement('div', {}, `accessToken: ${accessToken ? '✅ EXISTS' : '❌ NULL'}`),
+                                    React.createElement('div', {}, `Firebase config: ${isFirebaseConfigured ? '✅ YES' : '❌ NO'}`)
+                                )
                             )
                         ) : (
                             // Guest Mode
