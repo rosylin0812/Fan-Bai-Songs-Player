@@ -15,8 +15,17 @@
     <title>Music Player</title>
     
     <!-- Eruda Mobile DevTools -->
-    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-    <script>eruda.init();</script>
+    <script>
+        (function() {
+            var script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/eruda';
+            script.onload = function() {
+                eruda.init();
+                console.log('🔧 Eruda DevTools loaded! Look for green button in bottom-right corner.');
+            };
+            document.head.appendChild(script);
+        })();
+    </script>
     
     <style>
         * { 
