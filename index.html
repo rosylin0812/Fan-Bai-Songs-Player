@@ -1115,6 +1115,7 @@
             const [recentPlaylistId, setRecentPlaylistId] = useState(null);
             const [showDebug, setShowDebug] = useState(false);
             const [debugInfo, setDebugInfo] = useState({});
+            const [firebaseError, setFirebaseError] = useState(null); // Track Firebase errors
             const [editingPlaylist, setEditingPlaylist] = useState(null);
             const [editingPlaylistName, setEditingPlaylistName] = useState('');
             const [editingSong, setEditingSong] = useState(null);
@@ -2884,7 +2885,8 @@
                                     React.createElement('div', {}, `isSignedIn: ${isSignedIn ? '✅ YES' : '❌ NO'}`),
                                     React.createElement('div', {}, `firebaseUserId: ${firebaseUserId || '❌ NULL'}`),
                                     React.createElement('div', {}, `accessToken: ${accessToken ? '✅ EXISTS' : '❌ NULL'}`),
-                                    React.createElement('div', {}, `Firebase config: ${isFirebaseConfigured ? '✅ YES' : '❌ NO'}`)
+                                    React.createElement('div', {}, `Firebase config: ${isFirebaseConfigured ? '✅ YES' : '❌ NO'}`),
+                                    firebaseError && React.createElement('div', { style: { color: '#ff4444', marginTop: '6px', fontWeight: 'bold' } }, `🔥 ERROR: ${firebaseError}`)
                                 )
                             )
                         ) : (
@@ -3028,6 +3030,7 @@
                                                         
                                                     } catch (firebaseError) {
                                                         console.error('Firebase connection error:', firebaseError);
+                                                        setFirebaseError(firebaseError.message); // Save error for debug panel
                                                         // Continue anyway - Google Drive still works
                                                         alert(`✅ Signed in to Google Drive as ${user.name}!\n\n⚠️ Firebase sync unavailable (${firebaseError.message})\n\nGoogle Drive sync will still work.`);
                                                     }
