@@ -1190,34 +1190,11 @@
                 loadData(); 
             }, []);
 
-            // Firebase Real-Time Listener
+            // Firebase Real-Time Listener (DISABLED - causing black screen)
             useEffect(() => {
-                if (!firebaseUserId || !isFirebaseConfigured) return;
-                
-                console.log('🔥 Starting Firebase real-time listener for UID:', firebaseUserId);
-                
-                const unsubscribe = FirebaseDB.listenToPlaylists(firebaseUserId, (firebasePlaylists) => {
-                    console.log('📡 Firebase real-time update received:', firebasePlaylists.length, 'playlists');
-                    console.log('📡 Firebase data:', firebasePlaylists);
-                    
-                    // ALWAYS update playlists from Firebase (even if empty!)
-                    setPlaylists(firebasePlaylists);
-                    
-                    // If no active playlist but playlists exist, set first one
-                    if (!activePlaylist && firebasePlaylists.length > 0) {
-                        setActivePlaylist(firebasePlaylists[0].id);
-                    }
-                    
-                    // If active playlist was deleted, switch to another
-                    if (activePlaylist && !firebasePlaylists.find(p => p.id === activePlaylist)) {
-                        setActivePlaylist(firebasePlaylists.length > 0 ? firebasePlaylists[0].id : null);
-                    }
-                });
-                
-                return () => {
-                    console.log('🔥 Stopping Firebase listener');
-                    unsubscribe();
-                };
+                // Temporarily disabled to fix black screen issue
+                // Will re-enable after fixing infinite loop
+                return () => {};
             }, [firebaseUserId]);
 
             const loadData = async () => {
