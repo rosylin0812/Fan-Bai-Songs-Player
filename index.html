@@ -2946,14 +2946,40 @@
                                                         console.log('🔥 Connecting to Firebase...');
                                                         
                                                         const googleUserId = user.id; // Google's unique user ID
+                                                        console.log('Google User ID:', googleUserId);
                                                         
-                                                        // Check if this Google user already has a Firebase UID stored locally
+                                                        // STEP 1: Check local storage for mapping
                                                         const storedMapping = await DB.get('settings', 'firebaseUidMapping');
                                                         let firebaseUid = storedMapping?.value?.[googleUserId];
                                                         
+                                                        // STEP 2: If not found locally, check Firebase database
+                                                        if (!firebaseUid) {
+                                                            console.log('No local mapping found, checking Firebase...');
+                                                            try {
+                                                                const mappingSnapshot = await firebaseDB.ref(`googleIdMapping/${googleUserId}`).once('value');
+                                                                const mappingData = mappingSnapshot.val();
+                                                                if (mappingData && mappingData.firebaseUid) {
+                                                                    firebaseUid = mappingData.firebaseUid;
+                                                                    console.log('✅ Found Firebase UID in database:', firebaseUid);
+                                                                    
+                                                                    // Save to local storage for next time
+                                                                    const mapping = storedMapping?.value || {};
+                                                                    mapping[googleUserId] = firebaseUid;
+                                                                    await DB.save('settings', { 
+                                                                        key: 'firebaseUidMapping', 
+                                                                        value: mapping 
+                                                                    });
+                                                                } else {
+                                                                    console.log('No mapping found in Firebase either');
+                                                                }
+                                                            } catch (error) {
+                                                                console.error('Error checking Firebase mapping:', error);
+                                                            }
+                                                        }
+                                                        
                                                         if (firebaseUid) {
-                                                            // User has signed in before - try to restore session
-                                                            console.log('Found existing Firebase UID for this Google account:', firebaseUid);
+                                                            // User has signed in before - use existing UID
+                                                            console.log('Using existing Firebase UID for this Google account:', firebaseUid);
                                                             
                                                             // Sign in anonymously (will get a new UID, but we'll use the mapping)
                                                             await firebaseAuth.signInAnonymously();
