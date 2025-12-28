@@ -656,6 +656,12 @@
             .playlist-grid-card .text-sm {
                 font-size: 11px !important;
             }
+            
+            /* Guest mode warning box - wider on mobile */
+            .guest-warning-box {
+                max-width: 95% !important;
+                padding: 18px 20px !important;
+            }
         }
         
         @media (min-width: 769px) {
@@ -3749,9 +3755,6 @@
                                         }
                                     },
                                         React.createElement('div', { 
-                                            style: { fontSize: '48px', marginBottom: '20px' }
-                                        }, '🎵'),
-                                        React.createElement('div', { 
                                             style: { fontSize: '20px', fontWeight: '600', marginBottom: '12px' }
                                         }, 'No playlists yet'),
                                         React.createElement('div', { 
@@ -3760,6 +3763,7 @@
                                         
                                         // Guest mode warning (only show if NOT signed in)
                                         !isSignedIn && React.createElement('div', {
+                                            className: 'guest-warning-box',
                                             style: {
                                                 padding: '20px 24px',
                                                 marginTop: '32px',
@@ -3768,8 +3772,10 @@
                                                 borderRadius: '12px',
                                                 color: darkMode ? '#fbbf24' : '#d97706',
                                                 textAlign: 'left',
-                                                maxWidth: '500px',
-                                                margin: '24px auto 0'
+                                                maxWidth: '700px',
+                                                width: '100%',
+                                                margin: '32px auto 0',
+                                                boxSizing: 'border-box'
                                             }
                                         },
                                             // Title
