@@ -3749,20 +3749,20 @@
                                         }
                                     },
                                         React.createElement('div', { 
-                                            style: { fontSize: '48px', marginBottom: '16px' }
+                                            style: { fontSize: '48px', marginBottom: '20px' }
                                         }, '🎵'),
                                         React.createElement('div', { 
-                                            style: { fontSize: '18px', fontWeight: '600', marginBottom: '8px' }
+                                            style: { fontSize: '20px', fontWeight: '600', marginBottom: '12px' }
                                         }, 'No playlists yet'),
                                         React.createElement('div', { 
-                                            style: { fontSize: '14px', marginBottom: '20px' }
+                                            style: { fontSize: '15px', marginBottom: '32px', opacity: 0.8 }
                                         }, searchQuery ? 'No results found' : 'Click "Create New Playlist" to get started'),
                                         
                                         // Guest mode warning (only show if NOT signed in)
                                         !isSignedIn && React.createElement('div', {
                                             style: {
-                                                padding: '16px 20px',
-                                                marginTop: '24px',
+                                                padding: '20px 24px',
+                                                marginTop: '32px',
                                                 background: darkMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.08)',
                                                 border: `1px solid ${darkMode ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.2)'}`,
                                                 borderRadius: '12px',
@@ -3775,9 +3775,9 @@
                                             // Title
                                             React.createElement('div', {
                                                 style: {
-                                                    fontSize: '15px',
+                                                    fontSize: '16px',
                                                     fontWeight: '700',
-                                                    marginBottom: '12px',
+                                                    marginBottom: '16px',
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     gap: '8px'
@@ -3787,15 +3787,15 @@
                                             // Subtitle with icon
                                             React.createElement('div', {
                                                 style: {
-                                                    fontSize: '13px',
-                                                    marginBottom: '8px',
+                                                    fontSize: '14px',
+                                                    marginBottom: '10px',
                                                     display: 'flex',
                                                     alignItems: 'flex-start',
                                                     gap: '8px'
                                                 }
                                             },
                                                 React.createElement('span', { 
-                                                    style: { fontSize: '16px', flexShrink: 0 } 
+                                                    style: { fontSize: '18px', flexShrink: 0 } 
                                                 }, 'ℹ️'),
                                                 React.createElement('span', {}, t.guestModeSubtitle)
                                             ),
@@ -3803,16 +3803,16 @@
                                             // Bullet points
                                             React.createElement('div', {
                                                 style: {
-                                                    fontSize: '13px',
-                                                    lineHeight: '1.6',
-                                                    marginLeft: '24px',
-                                                    marginBottom: '12px'
+                                                    fontSize: '14px',
+                                                    lineHeight: '1.8',
+                                                    marginLeft: '26px',
+                                                    marginBottom: '16px'
                                                 }
                                             },
-                                                React.createElement('div', { style: { marginBottom: '4px' } }, 
+                                                React.createElement('div', { style: { marginBottom: '6px' } }, 
                                                     `• ${t.guestModeBullet1}`
                                                 ),
-                                                React.createElement('div', { style: { marginBottom: '4px' } }, 
+                                                React.createElement('div', { style: { marginBottom: '6px' } }, 
                                                     `• ${t.guestModeBullet2}`
                                                 ),
                                                 React.createElement('div', {}, 
@@ -3825,14 +3825,14 @@
                                                 style: {
                                                     height: '1px',
                                                     background: darkMode ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.15)',
-                                                    margin: '12px 0'
+                                                    margin: '16px 0'
                                                 }
                                             }),
                                             
                                             // Tip
                                             React.createElement('div', {
                                                 style: {
-                                                    fontSize: '12px',
+                                                    fontSize: '13px',
                                                     lineHeight: '1.5',
                                                     opacity: 0.9
                                                 }
