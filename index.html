@@ -3700,6 +3700,83 @@
                                     style: { marginBottom: '24px', width: '100%' }
                                 }, t.createNewPlaylist),
                                 
+                                // Guest mode warning (show under button if NOT signed in and no playlists)
+                                !isSignedIn && playlists.length === 0 && React.createElement('div', {
+                                    className: 'guest-warning-box',
+                                    style: {
+                                        padding: '20px 24px',
+                                        marginBottom: '32px',
+                                        background: darkMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.08)',
+                                        border: `1px solid ${darkMode ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.2)'}`,
+                                        borderRadius: '12px',
+                                        color: darkMode ? '#fbbf24' : '#d97706',
+                                        textAlign: 'left',
+                                        maxWidth: '900px',
+                                        width: '100%',
+                                        margin: '0 auto 32px',
+                                        boxSizing: 'border-box'
+                                    }
+                                },
+                                    // Title
+                                    React.createElement('div', {
+                                        style: {
+                                            fontSize: '16px',
+                                            fontWeight: '700',
+                                            marginBottom: '16px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px'
+                                        }
+                                    }, t.guestModeTitle),
+                                    
+                                    // Subtitle (no icon)
+                                    React.createElement('div', {
+                                        style: {
+                                            fontSize: '14px',
+                                            marginBottom: '10px',
+                                            fontWeight: '500'
+                                        }
+                                    }, t.guestModeSubtitle),
+                                    
+                                    // Bullet points
+                                    React.createElement('div', {
+                                        style: {
+                                            fontSize: '14px',
+                                            lineHeight: '1.8',
+                                            marginLeft: '26px',
+                                            marginBottom: '16px'
+                                        }
+                                    },
+                                        React.createElement('div', { style: { marginBottom: '6px' } }, 
+                                            `• ${t.guestModeBullet1}`
+                                        ),
+                                        React.createElement('div', { style: { marginBottom: '6px' } }, 
+                                            `• ${t.guestModeBullet2}`
+                                        ),
+                                        React.createElement('div', {}, 
+                                            `• ${t.guestModeBullet3}`
+                                        )
+                                    ),
+                                    
+                                    // Separator
+                                    React.createElement('div', {
+                                        style: {
+                                            height: '1px',
+                                            background: darkMode ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.15)',
+                                            margin: '16px 0'
+                                        }
+                                    }),
+                                    
+                                    // Tip
+                                    React.createElement('div', {
+                                        style: {
+                                            fontSize: '13px',
+                                            lineHeight: '1.5',
+                                            opacity: 0.9
+                                        }
+                                    }, t.guestModeTip)
+                                ),
+                                
                                 React.createElement('div', { 
                                     className: 'text-2xl font-bold mb-4',
                                     className: 'text-color'
@@ -3761,84 +3838,7 @@
                                         }, 'No playlists yet'),
                                         React.createElement('div', { 
                                             style: { fontSize: '15px', marginBottom: '32px', opacity: 0.8 }
-                                        }, searchQuery ? 'No results found' : 'Click "Create New Playlist" to get started'),
-                                        
-                                        // Guest mode warning (only show if NOT signed in)
-                                        !isSignedIn && React.createElement('div', {
-                                            className: 'guest-warning-box',
-                                            style: {
-                                                padding: '20px 24px',
-                                                marginTop: '32px',
-                                                background: darkMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.08)',
-                                                border: `1px solid ${darkMode ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.2)'}`,
-                                                borderRadius: '12px',
-                                                color: darkMode ? '#fbbf24' : '#d97706',
-                                                textAlign: 'left',
-                                                maxWidth: '900px',
-                                                width: '100%',
-                                                margin: '32px auto 0',
-                                                boxSizing: 'border-box'
-                                            }
-                                        },
-                                            // Title
-                                            React.createElement('div', {
-                                                style: {
-                                                    fontSize: '16px',
-                                                    fontWeight: '700',
-                                                    marginBottom: '16px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '8px'
-                                                }
-                                            }, t.guestModeTitle),
-                                            
-                                            // Subtitle (no icon)
-                                            React.createElement('div', {
-                                                style: {
-                                                    fontSize: '14px',
-                                                    marginBottom: '10px',
-                                                    fontWeight: '500'
-                                                }
-                                            }, t.guestModeSubtitle),
-                                            
-                                            // Bullet points
-                                            React.createElement('div', {
-                                                style: {
-                                                    fontSize: '14px',
-                                                    lineHeight: '1.8',
-                                                    marginLeft: '26px',
-                                                    marginBottom: '16px'
-                                                }
-                                            },
-                                                React.createElement('div', { style: { marginBottom: '6px' } }, 
-                                                    `• ${t.guestModeBullet1}`
-                                                ),
-                                                React.createElement('div', { style: { marginBottom: '6px' } }, 
-                                                    `• ${t.guestModeBullet2}`
-                                                ),
-                                                React.createElement('div', {}, 
-                                                    `• ${t.guestModeBullet3}`
-                                                )
-                                            ),
-                                            
-                                            // Separator
-                                            React.createElement('div', {
-                                                style: {
-                                                    height: '1px',
-                                                    background: darkMode ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.15)',
-                                                    margin: '16px 0'
-                                                }
-                                            }),
-                                            
-                                            // Tip
-                                            React.createElement('div', {
-                                                style: {
-                                                    fontSize: '13px',
-                                                    lineHeight: '1.5',
-                                                    opacity: 0.9
-                                                }
-                                            }, t.guestModeTip)
-                                        )
+                                        }, searchQuery ? 'No results found' : 'Click "Create New Playlist" to get started')
                                     )
                                 )
                             ),
