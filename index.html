@@ -1478,6 +1478,9 @@
                     debugLog('=== STARTING DATA LOAD ===');
                     setLoading(true);
                     
+                    // Check if first-time user
+                    const hasSeenWelcome = localStorage.getItem('hasSeenWelcome');
+                    
                     // Wait for all data to load
                     const [lists, mode, vol, recent, auth, quotaData] = await Promise.all([
                         DB.getAll('playlists'),
@@ -1493,6 +1496,14 @@
                     debugLog('Loaded volume:', vol?.value);
                     debugLog('Loaded recent:', recent?.value);
                     debugLog('Loaded auth:', auth ? 'Yes' : 'No');
+                    
+                    // Show welcome page if first time (no flag AND no playlists)
+                    if (!hasSeenWelcome && (!lists || lists.length === 0)) {
+                        debugLog('First time user - showing welcome page');
+                        setShowWelcome(true);
+                        setLoading(false);
+                        return; // Don't continue loading
+                    }
                     
                     // Set all state AFTER data is loaded
                     if (lists && lists.length > 0) {
@@ -2896,6 +2907,183 @@
                 p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 p.songs.some(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
             );
+
+            // Welcome Page (first-time users only)
+            if (showWelcome) {
+                return React.createElement('div', { 
+                    className: bg,
+                    style: { 
+                        height: '100vh', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        padding: '20px' 
+                    } 
+                },
+                    React.createElement('div', { 
+                        style: { 
+                            textAlign: 'center', 
+                            maxWidth: '450px',
+                            padding: '40px 30px',
+                            background: darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                            borderRadius: '20px',
+                            backdropFilter: 'blur(10px)',
+                            position: 'relative'
+                        } 
+                    },
+                        // Language + theme toggle in top right
+                        React.createElement('div', { 
+                            style: { 
+                                position: 'absolute',
+                                top: '20px',
+                                right: '20px',
+                                display: 'flex',
+                                gap: '8px',
+                                alignItems: 'center'
+                            }
+                        },
+                            // Language buttons
+                            React.createElement('button', {
+                                onClick: () => setLanguage('zh'),
+                                style: {
+                                    padding: '4px 10px',
+                                    fontSize: '12px',
+                                    fontWeight: language === 'zh' ? '700' : '500',
+                                    background: language === 'zh' ? (darkMode ? 'rgba(29, 185, 84, 0.2)' : 'rgba(29, 185, 84, 0.15)') : 'transparent',
+                                    color: language === 'zh' ? '#1DB954' : (darkMode ? '#b3b3b3' : '#666'),
+                                    border: language === 'zh' ? '1px solid #1DB954' : `1px solid ${darkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}`,
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }
+                            }, '中'),
+                            React.createElement('button', {
+                                onClick: () => setLanguage('en'),
+                                style: {
+                                    padding: '4px 10px',
+                                    fontSize: '12px',
+                                    fontWeight: language === 'en' ? '700' : '500',
+                                    background: language === 'en' ? (darkMode ? 'rgba(29, 185, 84, 0.2)' : 'rgba(29, 185, 84, 0.15)') : 'transparent',
+                                    color: language === 'en' ? '#1DB954' : (darkMode ? '#b3b3b3' : '#666'),
+                                    border: language === 'en' ? '1px solid #1DB954' : `1px solid ${darkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}`,
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }
+                            }, 'EN'),
+                            // Theme toggle
+                            React.createElement('button', {
+                                onClick: () => setDarkMode(!darkMode),
+                                className: 'icon-btn icon-btn-small',
+                                style: { marginLeft: '4px' }
+                            }, darkMode ? React.createElement(Icons.Sun) : React.createElement(Icons.Moon))
+                        ),
+                        
+                        React.createElement('div', { 
+                            style: { fontSize: '48px', marginBottom: '16px' } 
+                        }, '🎵'),
+                        
+                        React.createElement('h1', { 
+                            className: 'text-color',
+                            style: { 
+                                fontSize: '32px', 
+                                fontWeight: 'bold', 
+                                marginBottom: '12px' 
+                            } 
+                        }, t.welcomeTitle),
+                        
+                        React.createElement('p', { 
+                            className: txtMuted,
+                            style: { 
+                                fontSize: '16px', 
+                                marginBottom: '40px',
+                                lineHeight: '1.6'
+                            } 
+                        }, t.welcomeSubtitle),
+                        
+                        // Sign in with Google button
+                        React.createElement('button', { 
+                            onClick: () => {
+                                localStorage.setItem('hasSeenWelcome', 'true');
+                                setShowWelcome(false);
+                                // Trigger Google sign-in
+                                setTimeout(() => {
+                                    document.querySelector('[aria-label="Sign in with Google"]')?.click();
+                                }, 100);
+                            },
+                            style: { 
+                                width: '100%',
+                                padding: '16px 24px',
+                                fontSize: '16px',
+                                fontWeight: '600',
+                                marginBottom: '16px',
+                                background: 'linear-gradient(135deg, #4285f4 0%, #34a853 100%)',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '12px',
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 12px rgba(66, 133, 244, 0.4)',
+                                transition: 'transform 0.2s, box-shadow 0.2s'
+                            },
+                            onMouseOver: (e) => {
+                                e.target.style.transform = 'translateY(-2px)';
+                                e.target.style.boxShadow = '0 6px 16px rgba(66, 133, 244, 0.5)';
+                            },
+                            onMouseOut: (e) => {
+                                e.target.style.transform = 'translateY(0)';
+                                e.target.style.boxShadow = '0 4px 12px rgba(66, 133, 244, 0.4)';
+                            }
+                        }, 
+                            React.createElement('span', {}, `🔥 ${t.signInGoogle}`),
+                            React.createElement('div', { 
+                                style: { 
+                                    fontSize: '13px', 
+                                    opacity: 0.9, 
+                                    marginTop: '4px',
+                                    fontWeight: 'normal'
+                                } 
+                            }, t.signInDesc)
+                        ),
+                        
+                        // Continue as Guest button
+                        React.createElement('button', { 
+                            onClick: () => {
+                                localStorage.setItem('hasSeenWelcome', 'true');
+                                setShowWelcome(false);
+                                setLoading(false);
+                            },
+                            style: { 
+                                width: '100%',
+                                padding: '16px 24px',
+                                fontSize: '16px',
+                                fontWeight: '600',
+                                background: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                                color: darkMode ? '#ffffff' : '#000000',
+                                border: darkMode ? '1px solid rgba(255, 255, 255, 0.2)' : '1px solid rgba(0, 0, 0, 0.1)',
+                                borderRadius: '12px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                            },
+                            onMouseOver: (e) => {
+                                e.target.style.background = darkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)';
+                            },
+                            onMouseOut: (e) => {
+                                e.target.style.background = darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+                            }
+                        }, 
+                            React.createElement('span', {}, `📱 ${t.continueGuest}`),
+                            React.createElement('div', { 
+                                style: { 
+                                    fontSize: '13px', 
+                                    opacity: 0.7, 
+                                    marginTop: '4px',
+                                    fontWeight: 'normal'
+                                } 
+                            }, t.continueDesc)
+                        )
+                    )
+                );
+            }
 
             // FIXED: Better loading state
             if (loading) {
