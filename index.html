@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#2E8B57">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -28,10 +28,15 @@
             box-sizing: border-box; 
         }
         
-        body { 
+        html, body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             overflow: hidden;
             -webkit-font-smoothing: antialiased;
+            touch-action: manipulation; /* Prevent double-tap zoom */
+            -webkit-text-size-adjust: 100%; /* Prevent text scaling on orientation change */
+            width: 100%;
+            height: 100%;
+            position: fixed; /* Prevent scroll bounce */
         }
         
         /* Backgrounds - PURE BLACK for dark mode */
@@ -4283,6 +4288,18 @@
             );
         }
 
+        // Reset viewport zoom on load (mobile fix)
+        if ('visualViewport' in window) {
+            const resetViewport = () => {
+                const viewport = document.querySelector('meta[name="viewport"]');
+                if (viewport && window.visualViewport.scale !== 1) {
+                    viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+                }
+            };
+            window.visualViewport.addEventListener('resize', resetViewport);
+            window.visualViewport.addEventListener('scroll', resetViewport);
+        }
+        
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(React.createElement(MusicPlayer));
     </script>
