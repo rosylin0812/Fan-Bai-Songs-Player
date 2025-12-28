@@ -3790,21 +3790,14 @@
                                                 }
                                             }, t.guestModeTitle),
                                             
-                                            // Subtitle with icon
+                                            // Subtitle (no icon)
                                             React.createElement('div', {
                                                 style: {
                                                     fontSize: '14px',
                                                     marginBottom: '10px',
-                                                    display: 'flex',
-                                                    alignItems: 'flex-start',
-                                                    gap: '8px'
+                                                    fontWeight: '500'
                                                 }
-                                            },
-                                                React.createElement('span', { 
-                                                    style: { fontSize: '18px', flexShrink: 0 } 
-                                                }, 'ℹ️'),
-                                                React.createElement('span', {}, t.guestModeSubtitle)
-                                            ),
+                                            }, t.guestModeSubtitle),
                                             
                                             // Bullet points
                                             React.createElement('div', {
