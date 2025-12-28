@@ -1226,7 +1226,17 @@
                     // Status
                     apiCalls: 'API calls today',
                     streaming: 'Streaming',
-                    local: 'Local'
+                    local: 'Local',
+                    
+                    // Context menu
+                    duplicate: 'Duplicate',
+                    delete: 'Delete',
+                    
+                    // Search
+                    searchPlaceholder: 'Search playlists or songs...',
+                    
+                    // Sign in description
+                    signInDescription: 'Sign in once to activate both Google Drive storage and real-time sync across all devices'
                 },
                 zh: {
                     // Welcome page  
@@ -1291,7 +1301,17 @@
                     // Status
                     apiCalls: '今日 API 呼叫次數',
                     streaming: '串流',
-                    local: '本機'
+                    local: '本機',
+                    
+                    // Context menu
+                    duplicate: '複製',
+                    delete: '刪除',
+                    
+                    // Search
+                    searchPlaceholder: '搜尋播放清單或歌曲...',
+                    
+                    // Sign in description
+                    signInDescription: '登入一次即可啟用 Google 雲端硬碟儲存空間，並在所有裝置間即時同步'
                 }
             }[language];
 
@@ -3194,7 +3214,7 @@
                         onClick: () => duplicatePlaylist(contextMenu.playlist)
                     },
                         React.createElement(Icons.Copy),
-                        'Duplicate'
+                        t.duplicate
                     ),
                     React.createElement('div', {
                         className: 'context-menu-item',
@@ -3204,7 +3224,7 @@
                         }
                     },
                         React.createElement(Icons.Trash),
-                        'Delete'
+                        t.deleteButton
                     )
                 ),
                 
@@ -3578,7 +3598,7 @@
                                 // Description below
                                 React.createElement('div', { style: { fontSize: '14px', lineHeight: '1.5', textAlign: 'center', opacity: 0.8 } }, 
                                     isFirebaseConfigured ? 
-                                        'Sign in once to activate both Google Drive storage and real-time sync across all devices' 
+                                        t.signInDescription 
                                         : 
                                         'Sign in to sync your music library via Google Drive'
                                 )
@@ -3610,7 +3630,7 @@
                                 // Search Bar
                                 React.createElement('input', {
                                     type: 'search',
-                                    placeholder: 'Search playlists or songs...',
+                                    placeholder: t.searchPlaceholder,
                                     value: searchQuery,
                                     onChange: (e) => setSearchQuery(e.target.value),
                                     style: { marginBottom: '16px' }
