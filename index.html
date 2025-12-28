@@ -1187,6 +1187,8 @@
                     signInDesc: 'Sync across all devices',
                     continueGuest: 'Continue as Guest',
                     continueDesc: 'Local storage only',
+                    guestWarning: "Guest mode won't sync - data stays local only",
+                    guestModeNotice: "Guest Mode: Your music stays on this device only. Sign in with Google Drive to sync across devices.",
                     
                     // Sidebar
                     home: 'Home',
@@ -1263,6 +1265,8 @@
                     signInDesc: '跨裝置同步',
                     continueGuest: '以訪客身份繼續',
                     continueDesc: '僅本機儲存',
+                    guestWarning: '訪客模式不會同步 - 資料僅儲存於本機',
+                    guestModeNotice: '訪客模式：您的音樂僅保存在此裝置上。使用 Google 雲端硬碟登入以跨裝置同步。',
                     
                     // Sidebar
                     home: '首頁',
@@ -3045,8 +3049,29 @@
                             }, t.signInDesc)
                         ),
                         
+                        // Guest mode warning
+                        React.createElement('div', {
+                            style: {
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                padding: '12px 16px',
+                                marginBottom: '16px',
+                                background: darkMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.08)',
+                                border: `1px solid ${darkMode ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.2)'}`,
+                                borderRadius: '8px',
+                                fontSize: '13px',
+                                color: darkMode ? '#fbbf24' : '#d97706',
+                                lineHeight: '1.4'
+                            }
+                        },
+                            React.createElement('span', { style: { fontSize: '16px' } }, 'ℹ️'),
+                            React.createElement('span', {}, t.guestWarning)
+                        ),
+                        
                         // Continue as Guest button
-                        React.createElement('button', { 
+                        React.createElement('button', {
                             onClick: () => {
                                 localStorage.setItem('hasSeenWelcome', 'true');
                                 setShowWelcome(false);
@@ -3720,8 +3745,33 @@
                                             style: { fontSize: '18px', fontWeight: '600', marginBottom: '8px' }
                                         }, 'No playlists yet'),
                                         React.createElement('div', { 
-                                            style: { fontSize: '14px' }
-                                        }, searchQuery ? 'No results found' : 'Click "Create New Playlist" to get started')
+                                            style: { fontSize: '14px', marginBottom: '20px' }
+                                        }, searchQuery ? 'No results found' : 'Click "Create New Playlist" to get started'),
+                                        
+                                        // Guest mode warning (only show if NOT signed in)
+                                        !isSignedIn && React.createElement('div', {
+                                            style: {
+                                                display: 'flex',
+                                                alignItems: 'flex-start',
+                                                gap: '8px',
+                                                padding: '12px 16px',
+                                                marginTop: '20px',
+                                                background: darkMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.08)',
+                                                border: `1px solid ${darkMode ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.2)'}`,
+                                                borderRadius: '8px',
+                                                fontSize: '13px',
+                                                color: darkMode ? '#fbbf24' : '#d97706',
+                                                lineHeight: '1.5',
+                                                textAlign: 'left',
+                                                maxWidth: '500px',
+                                                margin: '20px auto 0'
+                                            }
+                                        },
+                                            React.createElement('span', { 
+                                                style: { fontSize: '16px', flexShrink: 0, marginTop: '1px' } 
+                                            }, 'ℹ️'),
+                                            React.createElement('span', {}, t.guestModeNotice)
+                                        )
                                     )
                                 )
                             ),
